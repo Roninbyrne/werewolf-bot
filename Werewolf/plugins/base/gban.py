@@ -23,6 +23,9 @@ async def gban_user(client: Client, message: Message):
         reason = args[2] if len(args) > 2 else "No reason provided"
 
     user_id = user.id
+    if global_ban_db.find_one({"_id": user_id}):
+        return await message.chat.send_message(f"🚫 <b>User is already globally banned.</b>\n🆔 <code>{user_id}</code>")
+
     username = f"@{user.username}" if user.username else "N/A"
     name = f"{user.first_name} {user.last_name or ''}".strip()
     initiator = message.from_user

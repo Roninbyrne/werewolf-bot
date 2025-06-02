@@ -1,6 +1,5 @@
 import asyncio
 import random
-from datetime import datetime
 from Werewolf import app
 from Werewolf.plugins.base.db import group_log_db, global_userinfo_db
 from pyrogram import filters
@@ -60,6 +59,7 @@ async def sync_callback(client, callback_query: CallbackQuery):
         return
 
     group_name = callback_query.message.chat.title or str(callback_query.message.chat.id)
+    await callback_query.message.delete()
 
     if callback_query.data == "sync_yes":
         group_data = await group_log_db.find({"group_name": group_name}).to_list(None)
@@ -84,12 +84,13 @@ async def sync_callback(client, callback_query: CallbackQuery):
             except PeerIdInvalid:
                 continue
 
-        await callback_query.message.reply_text(
-            f"Manual sync completed for **{group_name}**!\nTotal synced users: {success}"
+        await callback_query.answer(
+            f"Manual sync completed for {group_name}.\nTotal synced users: {success}",
+            show_alert=True
         )
 
     elif callback_query.data == "sync_no":
-        await callback_query.message.reply_text("Sync canceled.")
+        await callback_query.answer("Sync canceled.", show_alert=True)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()

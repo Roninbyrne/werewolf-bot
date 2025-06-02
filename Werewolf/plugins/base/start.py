@@ -35,7 +35,10 @@ async def help_menu(client, callback_query: CallbackQuery):
         [InlineKeyboardButton("3️⃣", callback_data="help_3"), InlineKeyboardButton("4️⃣", callback_data="help_4")],
         [InlineKeyboardButton("❌ Close", callback_data="close")]
     ])
-    await callback_query.message.edit_text("📖 Choose a help topic below:", reply_markup=keyboard)
+    await callback_query.message.edit_text(
+        f"📖 Choose a help topic below:\n\n<a href='{config.HELP_MENU_VIDEO}'>๏ Watch the Help Menu Video 🐺</a>",
+        reply_markup=keyboard
+    )
 
 
 @app.on_callback_query(filters.regex(r"help_[1-4]"))
@@ -49,8 +52,15 @@ async def show_help_section(client, callback_query: CallbackQuery):
         "4": "📕 <b>Help Topic 4</b>\n\nAdd advanced gameplay or dev info here."
     }
 
+    help_videos = {
+        "1": config.HELP_VIDEO_1,
+        "2": config.HELP_VIDEO_2,
+        "3": config.HELP_VIDEO_3,
+        "4": config.HELP_VIDEO_4
+    }
+
     await callback_query.message.edit_text(
-        help_texts[section],
+        f"{help_texts[section]}\n\n<a href='{help_videos[section]}'>๏ Watch Help Video 🎬</a>",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", callback_data="help_menu")]
         ])

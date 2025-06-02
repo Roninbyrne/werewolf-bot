@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ParseMode
 from Werewolf import app
 from Werewolf.plugins.base.db import group_log_db, global_userinfo_db, global_ban_db
 from config import STATS_VIDEO
@@ -23,7 +24,7 @@ async def show_stats(client: Client, message):
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Close", callback_data="stats_close")]]
         ),
-        parse_mode="html",
+        parse_mode=ParseMode.HTML,
         disable_web_page_preview=False
     )
 

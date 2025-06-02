@@ -10,59 +10,63 @@ from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 mongo_client = MongoClient(MONGO_DB_URI)
 group_log_db = mongo_client["Logs"]["group_logs"]
 
-@app.on_my_chat_member()
-async def log_bot_events(client, update):
-    old_status = update.old_chat_member.status
-    new_status = update.new_chat_member.status
-    chat = update.chat
-    group_id = chat.id
+@app.on_chat_member_updated()
+async def log_group_events(client, chat_member):
+bot_id = (await client.get_me()).id
+new_member = chat_member.new_chat_member
+old_member = chat_member.old_chat_member
 
-    if (
-        old_status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
-        and new_status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
-    ):
-        try:
-            invite_link = await client.export_chat_invite_link(group_id)
-        except:
-            invite_link = "Not available"
+if not (new_member and new_member.user and new_member.user.id == bot_id):  
+    return  
 
-        try:
-            member_count = await client.get_chat_members_count(group_id)
-        except:
-            member_count = "Unknown"
+chat = chat_member.chat  
+group_id = chat.id  
 
-        group_info = {
-            "_id": group_id,
-            "title": chat.title,
-            "username": chat.username,
-            "link": invite_link,
-            "dc_id": chat.dc_id,
-            "members": member_count
-        }
+if (  
+    old_member is None or old_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]  
+) and new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:  
+    try:  
+        invite_link = await client.export_chat_invite_link(group_id)  
+    except:  
+        invite_link = "Not available"  
 
-        group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
+    try:  
+        member_count = await client.get_chat_members_count(group_id)  
+    except:  
+        member_count = "Unknown"  
 
-        if await is_logging_enabled():
-            text = (
-                f"✅ <b>Bot added to group</b>\n\n"
-                f"📌 <b>Group Name:</b> {chat.title}\n"
-                f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-                f"🔗 <b>Group Link:</b> {invite_link}\n"
-                f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
-                f"👥 <b>Members:</b> {member_count}"
-            )
-            await client.send_message(LOGGER_ID, text)
+    group_info = {  
+        "_id": group_id,  
+        "title": chat.title,  
+        "username": chat.username,  
+        "link": invite_link,  
+        "dc_id": chat.dc_id,  
+        "members": member_count  
+    }  
 
-    elif (
-        old_status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
-        and new_status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
-    ):
-        group_log_db.delete_one({"_id": group_id})
+    group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)  
 
-        if await is_logging_enabled():
-            text = (
-                f"❌ <b>Bot removed from group</b>\n\n"
-                f"📌 <b>Group Name:</b> {chat.title}\n"
-                f"🆔 <b>Group ID:</b> <code>{group_id}</code>"
-            )
-            await client.send_message(LOGGER_ID, text)
+    if await is_logging_enabled():  
+        text = (  
+            f"✅ <b>Bot added to group</b>\n\n"  
+            f"📌 <b>Group Name:</b> {chat.title}\n"  
+            f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"  
+            f"🔗 <b>Group Link:</b> {invite_link}\n"  
+            f"🌐 <b>DC ID:</b> {chat.dc_id}\n"  
+            f"👥 <b>Members:</b> {member_count}"  
+        )  
+        await client.send_message(LOGGER_ID, text)  
+
+elif (  
+    old_member and old_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]  
+    and new_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]  
+):  
+    group_log_db.delete_one({"_id": group_id})  
+
+    if await is_logging_enabled():  
+        text = (  
+            f"❌ <b>Bot removed from group</b>\n\n"  
+            f"📌 <b>Group Name:</b> {chat.title}\n"  
+            f"🆔 <b>Group ID:</b> <code>{group_id}</code>"  
+        )  
+        await client.send_message(LOGGER_ID, text)

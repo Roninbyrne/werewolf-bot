@@ -1,10 +1,16 @@
 import os
+import logging
 from pyrogram import filters
-
 from Werewolf import app
 
+logging.basicConfig(
+    format='[%(asctime)s] [%(levelname)s] - %(message)s',
+    level=logging.INFO
+)
 
-@app.on_message(filters.command(["restart"]))
+@app.on_message(filters.command("restart") & filters.user(YOUR_OWNER_ID))
 async def restart_bot(_, message):
-    await message.reply_text("» ʀᴇsᴛᴀʀᴛɪɴɢ ʙᴏᴛ... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.")
+    logging.info(f"Restart command received from {message.from_user.id}")
+    await message.reply_text("🔄 Restarting bot... Please wait.")
+    logging.info("Shutting down process for restart...")
     os.system(f"kill -9 {os.getpid()} && bash start")

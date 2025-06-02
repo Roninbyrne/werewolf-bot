@@ -20,6 +20,9 @@ MONGO_DB_URI = (
     "?retryWrites=true&w=majority&appName=Yumi"
 )
 
+# Video shown on /start (private chat)
+START_VIDEO = "https://unitedcamps.in/Images/file_11380.jpg"
+
 # Log channel ID where bot sends important events/logs (e.g., bans, errors)
 LOGGER_ID = -1002059639505
 

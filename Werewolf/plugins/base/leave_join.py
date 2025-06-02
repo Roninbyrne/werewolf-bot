@@ -2,7 +2,7 @@ from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatMemberUpdated
 from Werewolf.plugins.base.db import group_log_db
-from config import MONGO_DB_URI, LOGGER_ID
+from config import LOGGER_ID
 import asyncio
 
 from Werewolf import app

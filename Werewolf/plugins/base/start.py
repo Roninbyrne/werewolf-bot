@@ -10,8 +10,7 @@ from config import LOGGER_ID
 async def start_pm(client, message: Message):
     user = message.from_user
 
-    # Logging
-    if is_logging_enabled():
+    if await is_logging_enabled():
         full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
         username = f"@{user.username}" if user.username else "N/A"
         log_text = (

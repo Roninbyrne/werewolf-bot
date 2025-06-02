@@ -36,7 +36,7 @@ async def help_menu(client, callback_query: CallbackQuery):
         [InlineKeyboardButton("❌ Close", callback_data="close")]
     ])
     await callback_query.message.edit_text(
-        f"📖 Choose a help topic below:\n\n<a href='{config.HELP_MENU_VIDEO}'>๏ Watch the Help Menu Video 🐺</a>",
+        f"<a href='{config.HELP_MENU_VIDEO}'>๏ Watch the Help Menu Video 🐺</a>\n\n📖 Choose a help topic below:",
         reply_markup=keyboard
     )
 

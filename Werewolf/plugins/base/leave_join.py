@@ -83,7 +83,7 @@ async def check_bot_removal():
                     except:
                         pass
             await asyncio.sleep(1)
-        await asyncio.sleep(10)
+        await asyncio.sleep(300)
 
 
 def start_removal_monitor():

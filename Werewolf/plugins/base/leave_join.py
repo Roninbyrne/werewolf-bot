@@ -61,9 +61,8 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
 
 
 async def check_bot_removal():
-    await app.start()
+    bot = await app.get_me()
     while True:
-        bot = await app.get_me()
         groups = group_log_db.find()
         for group in groups:
             group_id = group["_id"]
@@ -85,10 +84,12 @@ async def check_bot_removal():
                     except:
                         pass
             await asyncio.sleep(1)
-        await asyncio.sleep(300)
+        await asyncio.sleep(10)
 
 
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.create_task(check_bot_removal())
-    app.run()
+@app.on_startup()
+async def startup_tasks(client: Client):
+    asyncio.create_task(check_bot_removal())
+
+
+app.run()

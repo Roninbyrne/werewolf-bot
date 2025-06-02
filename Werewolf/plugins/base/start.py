@@ -7,6 +7,7 @@ from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 from Werewolf.plugins.base.db import global_userinfo_db
 from config import LOGGER_ID
 
+
 @app.on_message(filters.command("start") & filters.private)
 async def start_pm(client, message: Message):
     user = message.from_user
@@ -18,7 +19,7 @@ async def start_pm(client, message: Message):
         "username": user.username,
         "is_bot": user.is_bot
     }
-    global_userinfo_db.update_one({"_id": user.id}, {"$set": userinfo}, upsert=True)
+    await global_userinfo_db.update_one({"_id": user.id}, {"$set": userinfo}, upsert=True)
 
     if await is_logging_enabled():
         full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()

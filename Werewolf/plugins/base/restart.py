@@ -1,15 +1,13 @@
 import os
 import asyncio
 import logging
+from datetime import datetime
+import pytz
 from pyrogram import filters, Client
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from Werewolf import app
-from config import OWNER_ID
-
-logging.basicConfig(
-    format='[%(asctime)s] [%(levelname)s] - %(message)s',
-    level=logging.INFO
-)
+from config import OWNER_ID, LOGGER_ID
+from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 @app.on_message(filters.command("restart"))
 async def restart_command_handler(client: Client, message: Message):
@@ -18,19 +16,21 @@ async def restart_command_handler(client: Client, message: Message):
         return
 
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Restart", callback_data="confirm_restart"),
-            InlineKeyboardButton("❌ Cancel", callback_data="cancel_restart")
-        ]
+        [InlineKeyboardButton("✅ Restart", callback_data="confirm_restart"),
+         InlineKeyboardButton("❌ Cancel", callback_data="cancel_restart")]
     ])
-
     await message.reply_text("⚠️ R U Sure to Reboot Bot?", reply_markup=keyboard)
 
 @app.on_callback_query(filters.user(OWNER_ID) & filters.regex("confirm_restart"))
 async def confirm_restart_handler(client: Client, callback_query: CallbackQuery):
     await callback_query.message.delete()
     msg = await callback_query.message.reply_text("🔄 Restarting bot... Please wait.")
-    logging.info("Owner confirmed restart. Restarting...")
+
+    if is_logging_enabled():
+        ist = pytz.timezone("Asia/Kolkata")
+        time_now = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+        await client.send_message(LOGGER_ID, f"♻️ <b>Bot restarted at:</b> <code>{time_now} IST</code>")
+
     os.system(f"kill -9 {os.getpid()} && bash start")
 
 @app.on_callback_query(filters.user(OWNER_ID) & filters.regex("cancel_restart"))

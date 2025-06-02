@@ -48,5 +48,5 @@ async def ungban_user(client: Client, message: Message):
         f"👮‍♂️ <b>Globally unbanned by:</b> {initiator_name} [<code>{initiator_id}</code>]"
     )
 
-    await message.chat.send_message(text)
+    await client.send_message(message.chat.id, text)
     await client.send_message(GBAN_LOGS, text)

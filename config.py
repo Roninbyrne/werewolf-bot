@@ -37,6 +37,12 @@ HELP_VIDEO_4 = "https://unitedcamps.in/Images/file_11454.jpg"
 # Log channel ID where bot sends important events/logs (e.g., bans, errors)
 LOGGER_ID = -1002059639505
 
+# Video or photo for /stats 
+STATS_VIDEO = "https://unitedcamps.in/Images/file_5250.jpg"
+
+# Global ban channel ID where bot sends important gban and ungban info
+GBAN_ID = -1002059639505
+
 # Owner ID for specific use
 OWNER_ID = 7394132959
 

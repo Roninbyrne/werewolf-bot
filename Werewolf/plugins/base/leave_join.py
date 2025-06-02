@@ -1,15 +1,13 @@
 from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatMemberUpdated
-from pymongo import MongoClient
+from Werewolf.plugins.base.db import group_log_db
 from config import MONGO_DB_URI, LOGGER_ID
 import asyncio
 
 from Werewolf import app
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
-mongo_client = MongoClient(MONGO_DB_URI)
-group_log_db = mongo_client["Logs"]["group_logs"]
 
 
 @app.on_chat_member_updated()

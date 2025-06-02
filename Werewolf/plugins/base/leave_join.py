@@ -3,6 +3,7 @@ from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatMemberUpdated
 from pymongo import MongoClient
 from config import MONGO_DB_URI, LOGGER_ID
+import asyncio
 
 from Werewolf import app
 from Werewolf.core.mongo import mongodb
@@ -58,16 +59,36 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
             )
             await client.send_message(LOGGER_ID, text)
 
-    elif old_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR] and \
-         new_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]:
 
-        group_log_db.delete_one({"_id": group_id})
+async def check_bot_removal():
+    await app.start()
+    while True:
+        bot = await app.get_me()
+        groups = group_log_db.find()
+        for group in groups:
+            group_id = group["_id"]
+            try:
+                member = await app.get_chat_member(group_id, bot.id)
+                if member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]:
+                    raise Exception()
+            except Exception:
+                group_log_db.delete_one({"_id": group_id})
+                if await is_logging_enabled():
+                    text = (
+                        f"❌ <b>Bot removed from group</b>\n\n"
+                        f"📌 <b>Group Name:</b> {group.get('title', 'Unknown')}\n"
+                        f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
+                        f"👤 <b>Username:</b> @{group.get('username') or 'None'}"
+                    )
+                    try:
+                        await app.send_message(LOGGER_ID, text)
+                    except:
+                        pass
+            await asyncio.sleep(1)
+        await asyncio.sleep(300)
 
-        if await is_logging_enabled():
-            text = (
-                f"❌ <b>Bot removed from group</b>\n\n"
-                f"📌 <b>Group Name:</b> {chat.title}\n"
-                f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-                f"👤 <b>Username:</b> @{chat.username if chat.username else 'None'}"
-            )
-            await client.send_message(LOGGER_ID, text)
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.create_task(check_bot_removal())
+    app.run()

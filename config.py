@@ -22,15 +22,15 @@ MONGO_DB_URI = (
 
 # --------------start.py-------------
 
-# Video shown on /start (private chat)
-START_VIDEO = "https://example.com/start_video.mp4"
+# Video or Photo shown on /start (private chat)
+START_VIDEO = "https://unitedcamps.in/Images/file_5250.jpg"
 
-HELP_MENU_VIDEO = "https://example.com/help_menu.mp4"
+HELP_MENU_VIDEO = "https://unitedcamps.in/Images/file_5251.jpg"
 
-HELP_VIDEO_1 = "https://example.com/help1.mp4"
-HELP_VIDEO_2 = "https://example.com/help2.mp4"
-HELP_VIDEO_3 = "https://example.com/help3.mp4"
-HELP_VIDEO_4 = "https://example.com/help4.mp4"
+HELP_VIDEO_1 = "https://unitedcamps.in/Images/file_5251.jpg"
+HELP_VIDEO_2 = "https://unitedcamps.in/Images/file_11452.jpg"
+HELP_VIDEO_3 = "https://unitedcamps.in/Images/file_11453.jpg"
+HELP_VIDEO_4 = "https://unitedcamps.in/Images/file_11454.jpg"
 
 #------------------------------------
 

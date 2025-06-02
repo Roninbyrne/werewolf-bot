@@ -20,8 +20,19 @@ MONGO_DB_URI = (
     "?retryWrites=true&w=majority&appName=Yumi"
 )
 
+# --------------start.py-------------
+
 # Video shown on /start (private chat)
-START_VIDEO = "https://unitedcamps.in/Images/file_11380.jpg"
+START_VIDEO = "https://example.com/start_video.mp4"
+
+HELP_MENU_VIDEO = "https://example.com/help_menu.mp4"
+
+HELP_VIDEO_1 = "https://example.com/help1.mp4"
+HELP_VIDEO_2 = "https://example.com/help2.mp4"
+HELP_VIDEO_3 = "https://example.com/help3.mp4"
+HELP_VIDEO_4 = "https://example.com/help4.mp4"
+
+#------------------------------------
 
 # Log channel ID where bot sends important events/logs (e.g., bans, errors)
 LOGGER_ID = -1002059639505

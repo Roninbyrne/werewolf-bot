@@ -57,15 +57,3 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
                 f"👥 <b>Members:</b> {member_count}"
             )
             await client.send_message(LOGGER_ID, text)
-
-    if new_member.user.id == bot_id and new_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]:
-        group_log_db.delete_one({"_id": group_id})
-
-        if await is_logging_enabled():
-            reason = "banned" if new_member.status == ChatMemberStatus.BANNED else "removed"
-            text = (
-                f"❌ <b>Bot {reason} from group</b>\n\n"
-                f"📌 <b>Group Name:</b> {chat.title}\n"
-                f"🆔 <b>Group ID:</b> <code>{group_id}</code>"
-            )
-            await client.send_message(LOGGER_ID, text)

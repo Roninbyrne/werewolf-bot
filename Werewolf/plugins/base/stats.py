@@ -15,15 +15,16 @@ async def show_stats(client: Client, message):
         f"👥 Connected Groups: <b>{group_count}</b>\n"
         f"👤 Connected Users: <b>{user_count}</b>\n"
         f"🚫 Globally Banned: <b>{banned_count}</b>\n\n"
-        f"Here is the stats."
+        f"<a href='{STATS_VIDEO}'>๏ Here is the stats 🐺</a>"
     )
 
-    await message.reply_video(
-        video=START_VIDEO,
-        caption=caption,
+    await message.reply(
+        caption,
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Close", callback_data="stats_close")]]
-        )
+        ),
+        parse_mode="html",
+        disable_web_page_preview=False
     )
 
 @app.on_callback_query(filters.regex("stats_close"))

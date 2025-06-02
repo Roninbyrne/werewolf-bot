@@ -15,7 +15,7 @@ async def show_stats(client: Client, message):
         f"👥 Connected Groups: <b>{group_count}</b>\n"
         f"👤 Connected Users: <b>{user_count}</b>\n"
         f"🚫 Globally Banned: <b>{banned_count}</b>\n\n"
-        f"<a href='{STATS_VIDEO}'>๏ Here is the stats 🐺</a>"
+        f'<a href="{STATS_VIDEO}">๏ Here is the stats 🐺</a>'
     )
 
     await message.reply(

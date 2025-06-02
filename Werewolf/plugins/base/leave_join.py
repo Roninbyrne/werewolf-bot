@@ -4,10 +4,8 @@ from pyrogram.types import ChatMemberUpdated
 from pymongo import MongoClient
 from config import MONGO_DB_URI, LOGGER_ID
 import asyncio
-from pyrogram import idle
 
 from Werewolf import app
-from Werewolf.core.mongo import mongodb
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 mongo_client = MongoClient(MONGO_DB_URI)
@@ -88,10 +86,5 @@ async def check_bot_removal():
         await asyncio.sleep(10)
 
 
-async def main():
+def start_removal_monitor():
     asyncio.create_task(check_bot_removal())
-    await app.start()
-    await idle()
-    await app.stop()
-
-asyncio.get_event_loop().run_until_complete(main())

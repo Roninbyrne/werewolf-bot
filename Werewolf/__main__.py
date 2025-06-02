@@ -17,7 +17,7 @@ async def init():
     LOGGER("Werewolf").info("Werewolf Game Bot Started Successfully.")
     await idle()
     await app.stop()
-    LOGGER("Werewolf").info("Stopping Security Bot...")
+    LOGGER("Werewolf").info("Stopping Werewolf Game Bot...")
 
 
 if __name__ == "__main__":

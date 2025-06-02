@@ -5,7 +5,7 @@ from pyrogram import idle
 from Werewolf import LOGGER, app
 from Werewolf.plugins import ALL_MODULES
 from Werewolf.plugins.base.leave_join import start_removal_monitor
-from Werewolf.plugins.base.userinfo import setup_user_tracking
+from Werewolf.plugins.base.getuserinfo import setup_user_tracking
 
 
 async def init():

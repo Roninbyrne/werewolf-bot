@@ -33,7 +33,11 @@ def get_gban_keyboard(current_page, total_pages):
 
 @app.on_message(filters.command("gbanlist") & filters.user(OWNER_ID))
 async def show_gban_list(client: Client, message: Message):
-    data = list(global_ban_db.find({"banned_by": OWNER_ID}))
+    # Fetching data from the database asynchronously using motor
+    data = []
+    async for user in global_ban_db.find({"banned_by": OWNER_ID}):
+        data.append(user)
+
     if not data:
         return await message.reply("✅ No users are currently globally banned by you.")
 
@@ -47,7 +51,12 @@ async def show_gban_list(client: Client, message: Message):
 @app.on_callback_query(filters.regex(r"gbanlist:(\d+)") & filters.user(OWNER_ID))
 async def paginate_gban_list(client: Client, query: CallbackQuery):
     page = int(query.data.split(":")[1])
-    data = list(global_ban_db.find({"banned_by": OWNER_ID}))
+
+    # Fetching data from the database asynchronously using motor
+    data = []
+    async for user in global_ban_db.find({"banned_by": OWNER_ID}):
+        data.append(user)
+
     total_pages = (len(data) + PER_PAGE - 1) // PER_PAGE
 
     if page >= total_pages:

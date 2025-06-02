@@ -5,6 +5,7 @@ from config import MONGO_DB_URI, LOGGER_ID
 
 from Werewolf import app
 from Werewolf.core.mongo import mongodb
+from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 mongo_client = MongoClient(MONGO_DB_URI)
 group_log_db = mongo_client["Logs"]["group_logs"]
@@ -40,21 +41,23 @@ async def log_group_events(client, chat_member):
 
         group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
 
-        text = (
-            f"✅ <b>Bot added to group</b>\n\n"
-            f"📌 <b>Group Name:</b> {chat.title}\n"
-            f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-            f"🔗 <b>Group Link:</b> {invite_link}\n"
-            f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
-            f"👥 <b>Members:</b> {member_count}"
-        )
-        await client.send_message(LOGGER_ID, text)
+        if is_logging_enabled():
+            text = (
+                f"✅ <b>Bot added to group</b>\n\n"
+                f"📌 <b>Group Name:</b> {chat.title}\n"
+                f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
+                f"🔗 <b>Group Link:</b> {invite_link}\n"
+                f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
+                f"👥 <b>Members:</b> {member_count}"
+            )
+            await client.send_message(LOGGER_ID, text)
 
     elif chat_member.new_chat_member.status == ChatMemberStatus.LEFT:
         group_log_db.delete_one({"_id": group_id})
-        text = (
-            f"❌ <b>Bot removed from group</b>\n\n"
-            f"📌 <b>Group Name:</b> {chat.title}\n"
-            f"🆔 <b>Group ID:</b> <code>{group_id}</code>"
-        )
-        await client.send_message(LOGGER_ID, text)
+        if is_logging_enabled():
+            text = (
+                f"❌ <b>Bot removed from group</b>\n\n"
+                f"📌 <b>Group Name:</b> {chat.title}\n"
+                f"🆔 <b>Group ID:</b> <code>{group_id}</code>"
+            )
+            await client.send_message(LOGGER_ID, text)

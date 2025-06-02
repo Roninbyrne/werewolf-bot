@@ -10,21 +10,17 @@ from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 mongo_client = MongoClient(MONGO_DB_URI)
 group_log_db = mongo_client["Logs"]["group_logs"]
 
-@app.on_chat_member_updated()
-async def log_group_events(client, chat_member):
-    bot_id = (await client.get_me()).id
-    new_member = chat_member.new_chat_member
-    old_member = chat_member.old_chat_member
-
-    if not (new_member and new_member.user and new_member.user.id == bot_id):
-        return
-
-    chat = chat_member.chat
+@app.on_my_chat_member()
+async def log_bot_events(client, update):
+    old_status = update.old_chat_member.status
+    new_status = update.new_chat_member.status
+    chat = update.chat
     group_id = chat.id
 
     if (
-        old_member is None or old_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
-    ) and new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
+        old_status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
+        and new_status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
+    ):
         try:
             invite_link = await client.export_chat_invite_link(group_id)
         except:
@@ -58,8 +54,8 @@ async def log_group_events(client, chat_member):
             await client.send_message(LOGGER_ID, text)
 
     elif (
-        old_member and old_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
-        and new_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
+        old_status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
+        and new_status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
     ):
         group_log_db.delete_one({"_id": group_id})
 

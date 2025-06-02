@@ -6,7 +6,6 @@ from pyrogram import idle
 import config
 from Werewolf import LOGGER, app
 from Werewolf.plugins import ALL_MODULES
-from config import BANNED_USERS
 
 
 async def init():

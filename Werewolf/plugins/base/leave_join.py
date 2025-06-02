@@ -20,40 +20,42 @@ async def log_group_events(client, chat_member):
         chat = chat_member.chat
         group_id = chat.id
 
-        if new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
-            try:
-                invite_link = await client.export_chat_invite_link(group_id)
-            except:
-                invite_link = "Not available"
+        try:
+            invite_link = await client.export_chat_invite_link(group_id)
+        except:
+            invite_link = "Not available"
 
-            try:
-                member_count = await client.get_chat_members_count(group_id)
-            except:
-                member_count = "Unknown"
+        try:
+            member_count = await client.get_chat_members_count(group_id)
+        except:
+            member_count = "Unknown"
 
-            group_info = {
-                "_id": group_id,
-                "title": chat.title,
-                "username": chat.username,
-                "link": invite_link,
-                "dc_id": chat.dc_id,
-                "members": member_count
-            }
+        group_info = {
+            "_id": group_id,
+            "title": chat.title,
+            "username": chat.username,
+            "link": invite_link,
+            "dc_id": chat.dc_id,
+            "members": member_count
+        }
 
-            group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
+        group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
 
-            if await is_logging_enabled():
-                text = (
-                    f"✅ <b>Bot added to group</b>\n\n"
-                    f"📌 <b>Group Name:</b> {chat.title}\n"
-                    f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-                    f"🔗 <b>Group Link:</b> {invite_link}\n"
-                    f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
-                    f"👥 <b>Members:</b> {member_count}"
-                )
-                await client.send_message(LOGGER_ID, text)
+        if await is_logging_enabled():
+            text = (
+                f"✅ <b>Bot added to group</b>\n\n"
+                f"📌 <b>Group Name:</b> {chat.title}\n"
+                f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
+                f"🔗 <b>Group Link:</b> {invite_link}\n"
+                f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
+                f"👥 <b>Members:</b> {member_count}"
+            )
+            await client.send_message(LOGGER_ID, text)
 
-    elif old_member and old_member.user and old_member.user.id == bot_id and new_member.status == ChatMemberStatus.LEFT:
+    elif (
+        old_member and old_member.user and old_member.user.id == bot_id and
+        (not new_member or new_member.status == ChatMemberStatus.LEFT)
+    ):
         chat = chat_member.chat
         group_id = chat.id
 

@@ -60,7 +60,7 @@ async def show_help_section(client, callback_query: CallbackQuery):
     }
 
     await callback_query.message.edit_text(
-        f"{help_texts[section]}\n\n<a href='{help_videos[section]}'>๏ Watch Help Video 🎬</a>",
+        f"<a href='{help_videos[section]}'>๏ Watch Help Video 🎬</a>\n\n{help_texts[section]}",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", callback_data="help_menu")]
         ])

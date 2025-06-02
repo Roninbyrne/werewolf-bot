@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.errors import UserAdminInvalid, ChatAdminRequired, UserNotParticipant
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Werewolf import app
 from Werewolf.plugins.base.db import group_log_db, global_ban_db
 from config import OWNER_ID, GBAN_LOGS
@@ -63,8 +63,12 @@ async def gban_user(client: Client, message: Message):
 
             data = global_ban_db.find_one({"_id": user_id}) or {}
             alerts = data.get("alerts", {})
-            last_alert = alerts.get(str(group_id), 0)
+            disabled_alerts = data.get("alerts_disabled", [])
             now_ts = int(time.time())
+            last_alert = alerts.get(str(group_id), 0)
+
+            if group_id in disabled_alerts:
+                continue
 
             if now_ts - last_alert >= 86400:
                 try:
@@ -72,7 +76,10 @@ async def gban_user(client: Client, message: Message):
                         group_id,
                         f"#Alert\n🚨 This user has been globally banned.\n"
                         f"👤 <b>User:</b> {name} ({user_id})\n"
-                        f"📄 <b>Reason:</b> {reason}"
+                        f"📄 <b>Reason:</b> {reason}",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🔕 Stop Future Alerts", callback_data=f"stop_alert:{user_id}")]
+                        ])
                     )
                     alerts[str(group_id)] = now_ts
                     global_ban_db.update_one({"_id": user_id}, {"$set": {"alerts": alerts}})
@@ -113,3 +120,22 @@ async def gban_user(client: Client, message: Message):
     await status_msg.delete()
     await message.chat.send_message(final_text)
     await client.send_message(GBAN_LOGS, final_text)
+
+@app.on_callback_query(filters.regex(r"stop_alert:(\d+)"))
+async def stop_gban_alerts(client: Client, callback_query):
+    user_id = int(callback_query.data.split(":")[1])
+    group_id = callback_query.message.chat.id
+
+    db_user = global_ban_db.find_one({"_id": user_id}) or {}
+    disabled_alerts = db_user.get("alerts_disabled", [])
+
+    if group_id not in disabled_alerts:
+        disabled_alerts.append(group_id)
+        global_ban_db.update_one(
+            {"_id": user_id},
+            {"$set": {"alerts_disabled": disabled_alerts}},
+            upsert=True
+        )
+
+    await callback_query.answer("🔕 Alerts disabled for this user in this group.", show_alert=True)
+    await callback_query.message.edit_reply_markup(reply_markup=None)

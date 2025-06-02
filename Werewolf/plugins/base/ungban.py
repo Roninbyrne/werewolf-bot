@@ -28,7 +28,7 @@ async def ungban_user(client: Client, message: Message):
     initiator_id = initiator.id
 
     unbanned_in = 0
-    for group in group_log_db.find():
+    async for group in group_log_db.find():
         group_id = group["_id"]
         try:
             await client.unban_chat_member(group_id, user_id)

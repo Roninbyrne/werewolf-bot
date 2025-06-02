@@ -9,7 +9,6 @@ from Werewolf import app
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 
-
 @app.on_chat_member_updated()
 async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
     bot_id = (await client.get_me()).id
@@ -43,7 +42,7 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
             "members": member_count
         }
 
-        group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
+        await group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
 
         if await is_logging_enabled():
             text = (
@@ -58,17 +57,18 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
 
 
 async def check_bot_removal():
+    await asyncio.sleep(60)
     bot = await app.get_me()
     while True:
-        groups = group_log_db.find()
-        for group in groups:
+        cursor = group_log_db.find()
+        async for group in cursor:
             group_id = group["_id"]
             try:
                 member = await app.get_chat_member(group_id, bot.id)
                 if member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]:
                     raise Exception()
             except Exception:
-                group_log_db.delete_one({"_id": group_id})
+                await group_log_db.delete_one({"_id": group_id})
                 if await is_logging_enabled():
                     text = (
                         f"❌ <b>Bot removed from group</b>\n\n"

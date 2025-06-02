@@ -19,6 +19,9 @@ async def log_group_events(client, chat_member):
     if not (new_member and new_member.user and new_member.user.id == bot_id):
         return
 
+    if not old_member or not new_member:
+        return
+
     chat = chat_member.chat
     group_id = chat.id
 

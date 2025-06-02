@@ -24,7 +24,7 @@ async def gban_user(client: Client, message: Message):
 
     user_id = user.id
     if global_ban_db.find_one({"_id": user_id}):
-        return await message.chat.send_message(f"🚫 <b>User is already globally banned.</b>\n🆔 <code>{user_id}</code>")
+        return await client.send_message(message.chat.id, f"🚫 <b>User is already globally banned.</b>\n🆔 <code>{user_id}</code>")
 
     username = f"@{user.username}" if user.username else "N/A"
     name = f"{user.first_name} {user.last_name or ''}".strip()
@@ -34,7 +34,8 @@ async def gban_user(client: Client, message: Message):
     group_count = group_log_db.count_documents({})
     estimated_time = round(group_count * 0.5, 2)
 
-    status_msg = await message.chat.send_message(
+    status_msg = await client.send_message(
+        message.chat.id,
         f"🔄 <b>Imposing Global Ban...</b>\n"
         f"👮‍♂️ <b>Initiated by:</b> {initiator_name}\n"
         f"🚫 <b>Target:</b> {name}\n"
@@ -121,7 +122,7 @@ async def gban_user(client: Client, message: Message):
     )
 
     await status_msg.delete()
-    await message.chat.send_message(final_text)
+    await client.send_message(message.chat.id, final_text)
     await client.send_message(GBAN_LOGS, final_text)
 
 @app.on_callback_query(filters.regex(r"stop_alert:(\d+)"))

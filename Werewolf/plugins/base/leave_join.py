@@ -19,16 +19,12 @@ async def log_group_events(client, chat_member):
     if not (new_member and new_member.user and new_member.user.id == bot_id):
         return
 
-    if not old_member or not new_member:
-        return
-
     chat = chat_member.chat
     group_id = chat.id
 
     if (
-        old_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
-        and new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
-    ):
+        old_member is None or old_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
+    ) and new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
         try:
             invite_link = await client.export_chat_invite_link(group_id)
         except:
@@ -62,7 +58,7 @@ async def log_group_events(client, chat_member):
             await client.send_message(LOGGER_ID, text)
 
     elif (
-        old_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
+        old_member and old_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]
         and new_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
     ):
         group_log_db.delete_one({"_id": group_id})

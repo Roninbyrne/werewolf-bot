@@ -3,12 +3,27 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 
 import config
 from Werewolf import app
-
+from Werewolf.plugins.base.logging_toggle import is_logging_enabled
+from config import LOGGER_ID
 
 @app.on_message(filters.command("start") & filters.private)
 async def start_pm(client, message: Message):
+    user = message.from_user
+
+    # Logging
+    if is_logging_enabled():
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        username = f"@{user.username}" if user.username else "N/A"
+        log_text = (
+            f"📩 <b>User Started the Bot</b>\n\n"
+            f"👤 <b>Name:</b> {full_name}\n"
+            f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+            f"🔗 <b>Username:</b> {username}"
+        )
+        await client.send_message(LOGGER_ID, log_text)
+
     text = (
-        f"<b>нєу {message.from_user.first_name}.\n"
+        f"<b>нєу {user.first_name}.\n"
         f"๏ ɪᴍ 𝗪ᴇʀᴇᴡᴏʟꜰ 花 子 — ᴀ ᴍᴜʟᴛɪ-ᴘʟᴀʏᴇʀ ɢᴀᴍᴇ ʙᴏᴛ ʙᴀꜱᴇᴅ ᴏɴ ᴛʜᴇ ᴄʟᴀꜱꜱɪᴄ ᴡᴇʀᴇᴡᴏʟꜰ ɢᴀᴍᴇ.\n"
         f"๏ ᴛᴀᴘ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ꜱᴛᴀʀᴛᴇᴅ ᴏʀ ꜱᴇᴇ ᴄᴏᴍᴍᴀɴᴅꜱ.</b>"
     )

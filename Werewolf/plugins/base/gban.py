@@ -7,6 +7,7 @@ from config import OWNER_ID, GBAN_LOGS
 import asyncio
 import time
 
+
 @app.on_message(filters.command("gban") & filters.user(OWNER_ID))
 async def gban_user(client: Client, message: Message):
     if len(message.command) < 2 and not message.reply_to_message:
@@ -23,7 +24,8 @@ async def gban_user(client: Client, message: Message):
         reason = args[2] if len(args) > 2 else "No reason provided"
 
     user_id = user.id
-    if global_ban_db.find_one({"_id": user_id}):
+
+    if await global_ban_db.find_one({"_id": user_id}):
         return await client.send_message(message.chat.id, f"🚫 <b>User is already globally banned.</b>\n🆔 <code>{user_id}</code>")
 
     username = f"@{user.username}" if user.username else "N/A"
@@ -31,7 +33,7 @@ async def gban_user(client: Client, message: Message):
     initiator = message.from_user
     initiator_name = initiator.first_name
 
-    group_count = group_log_db.count_documents({})
+    group_count = await group_log_db.count_documents({})
     estimated_time = round(group_count * 0.5, 2)
 
     status_msg = await client.send_message(
@@ -49,12 +51,15 @@ async def gban_user(client: Client, message: Message):
     held_in = 0
     start_time = time.time()
 
-    for group in group_log_db.find():
+    cursor = group_log_db.find()
+    async for group in cursor:
         group_id = group["_id"]
         try:
             await client.get_chat_member(group_id, user_id)
         except (UserNotParticipant, Exception):
-            global_ban_db.update_one({"_id": user_id}, {"$addToSet": {"held_in": group_id}}, upsert=True)
+            await global_ban_db.update_one(
+                {"_id": user_id}, {"$addToSet": {"held_in": group_id}}, upsert=True
+            )
             held_in += 1
             continue
 
@@ -62,12 +67,14 @@ async def gban_user(client: Client, message: Message):
             await client.ban_chat_member(group_id, user_id)
             banned_in += 1
         except (UserAdminInvalid, ChatAdminRequired):
-            global_ban_db.update_one({"_id": user_id}, {"$addToSet": {"held_in": group_id}}, upsert=True)
+            await global_ban_db.update_one(
+                {"_id": user_id}, {"$addToSet": {"held_in": group_id}}, upsert=True
+            )
             held_in += 1
 
-            data = global_ban_db.find_one({"_id": user_id}) or {}
-            alerts = data.get("alerts", {})
-            disabled_alerts = data.get("alerts_disabled", [])
+            db_user = await global_ban_db.find_one({"_id": user_id}) or {}
+            alerts = db_user.get("alerts", {})
+            disabled_alerts = db_user.get("alerts_disabled", [])
             now_ts = int(time.time())
             last_alert = alerts.get(str(group_id), 0)
 
@@ -86,14 +93,14 @@ async def gban_user(client: Client, message: Message):
                         ])
                     )
                     alerts[str(group_id)] = now_ts
-                    global_ban_db.update_one({"_id": user_id}, {"$set": {"alerts": alerts}})
+                    await global_ban_db.update_one({"_id": user_id}, {"$set": {"alerts": alerts}})
                 except:
                     pass
             continue
 
         await asyncio.sleep(0.5)
 
-    global_ban_db.update_one(
+    await global_ban_db.update_one(
         {"_id": user_id},
         {
             "$set": {
@@ -125,17 +132,18 @@ async def gban_user(client: Client, message: Message):
     await client.send_message(message.chat.id, final_text)
     await client.send_message(GBAN_LOGS, final_text)
 
+
 @app.on_callback_query(filters.regex(r"stop_alert:(\d+)"))
 async def stop_gban_alerts(client: Client, callback_query):
     user_id = int(callback_query.data.split(":")[1])
     group_id = callback_query.message.chat.id
 
-    db_user = global_ban_db.find_one({"_id": user_id}) or {}
+    db_user = await global_ban_db.find_one({"_id": user_id}) or {}
     disabled_alerts = db_user.get("alerts_disabled", [])
 
     if group_id not in disabled_alerts:
         disabled_alerts.append(group_id)
-        global_ban_db.update_one(
+        await global_ban_db.update_one(
             {"_id": user_id},
             {"$set": {"alerts_disabled": disabled_alerts}},
             upsert=True

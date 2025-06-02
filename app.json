@@ -1,0 +1,68 @@
+{
+  "name": "Werewolf",
+  "description": "A feature-rich Telegram game bot for playing the classic Werewolf party game, built using Python, Pyrogram, and Py-Tgcalls.",
+  "logo": "https://te.legra.ph/file/b8a0c1a00db3e57522b53.jpg",
+  "keywords": [
+    "python3",
+    "telegram",
+    "bot",
+    "Game",
+    "Content",
+    "Game-bot",
+    "pyrogram"
+  ],
+  "env": {
+    "API_ID": {
+      "description": "Get this value from https://my.telegram.org",
+      "value": "",
+      "required": false
+    },
+    "API_HASH": {
+      "description": "Get this value from https://my.telegram.org",
+      "value": "",
+      "required": false
+    },
+    "BOT_TOKEN": {
+      "description": "A Bot's token from Botfather",
+      "value": "",
+      "required": false
+    },
+    "MONGO_DB_URI": {
+      "description": "Get a MongoDB URL from https://cloud.mongodb.com.",
+      "value": "",
+      "required": false
+    },
+    "OWNER_ID": {
+      "description": "The user ID of the person you want to designate as the bot owner.",
+      "value": "",
+      "required": false
+    },
+    "HEROKU_API_KEY": {
+      "description": "Your Heroku account's API key",
+      "value": "",
+      "required": false
+    },
+    "HEROKU_APP_NAME": {
+      "description": "Your Heroku app name",
+      "value": "",
+      "required": false
+    },
+    "LOGGER_ID": {
+      "description": "The ID of your log group or channel. For groups, add the bot and promote it as admin. For channels, ensure the bot is an admin too.",
+      "value": "",
+      "required": false
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    },
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+    }
+  ],
+  "stack": "container"
+}

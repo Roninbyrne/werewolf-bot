@@ -43,15 +43,15 @@ async def log_group_events(client, chat_member):
             group_log_db.update_one({"_id": group_id}, {"$set": group_info}, upsert=True)
 
             if await is_logging_enabled():
-    text = (
-        f"✅ <b>Bot added to group</b>\n\n"
-        f"📌 <b>Group Name:</b> {chat.title}\n"
-        f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-        f"🔗 <b>Group Link:</b> {invite_link}\n"
-        f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
-        f"👥 <b>Members:</b> {member_count}"
-    )
-    await client.send_message(LOGGER_ID, text)
+                text = (
+                    f"✅ <b>Bot added to group</b>\n\n"
+                    f"📌 <b>Group Name:</b> {chat.title}\n"
+                    f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
+                    f"🔗 <b>Group Link:</b> {invite_link}\n"
+                    f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
+                    f"👥 <b>Members:</b> {member_count}"
+                )
+                await client.send_message(LOGGER_ID, text)
 
     elif old_member and old_member.user and old_member.user.id == bot_id and new_member.status == ChatMemberStatus.LEFT:
         chat = chat_member.chat
@@ -60,9 +60,9 @@ async def log_group_events(client, chat_member):
         group_log_db.delete_one({"_id": group_id})
 
         if await is_logging_enabled():
-    text = (
-        f"❌ <b>Bot removed from group</b>\n\n"
-        f"📌 <b>Group Name:</b> {chat.title}\n"
-        f"🆔 <b>Group ID:</b> <code>{group_id}</code>"
-    )
-    await client.send_message(LOGGER_ID, text)
+            text = (
+                f"❌ <b>Bot removed from group</b>\n\n"
+                f"📌 <b>Group Name:</b> {chat.title}\n"
+                f"🆔 <b>Group ID:</b> <code>{group_id}</code>"
+            )
+            await client.send_message(LOGGER_ID, text)

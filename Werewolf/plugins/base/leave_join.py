@@ -1,5 +1,6 @@
 from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus
+from pyrogram.types import ChatMemberUpdated
 from pymongo import MongoClient
 from config import MONGO_DB_URI, LOGGER_ID
 
@@ -10,8 +11,9 @@ from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 mongo_client = MongoClient(MONGO_DB_URI)
 group_log_db = mongo_client["Logs"]["group_logs"]
 
+
 @app.on_chat_member_updated()
-async def log_group_events(client, chat_member):
+async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
     bot_id = (await client.get_me()).id
     new_member = chat_member.new_chat_member
     old_member = chat_member.old_chat_member
@@ -27,12 +29,12 @@ async def log_group_events(client, chat_member):
     ) and new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
         try:
             invite_link = await client.export_chat_invite_link(group_id)
-        except:
+        except Exception:
             invite_link = "Not available"
 
         try:
-            member_count = await client.get_chat_members_count(group_id)
-        except:
+            member_count = (await client.get_chat(group_id)).members_count
+        except Exception:
             member_count = "Unknown"
 
         group_info = {
@@ -40,7 +42,6 @@ async def log_group_events(client, chat_member):
             "title": chat.title,
             "username": chat.username,
             "link": invite_link,
-            "dc_id": chat.dc_id,
             "members": member_count
         }
 
@@ -52,7 +53,7 @@ async def log_group_events(client, chat_member):
                 f"📌 <b>Group Name:</b> {chat.title}\n"
                 f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
                 f"🔗 <b>Group Link:</b> {invite_link}\n"
-                f"🌐 <b>DC ID:</b> {chat.dc_id}\n"
+                f"👤 <b>Username:</b> @{chat.username if chat.username else 'None'}\n"
                 f"👥 <b>Members:</b> {member_count}"
             )
             await client.send_message(LOGGER_ID, text)

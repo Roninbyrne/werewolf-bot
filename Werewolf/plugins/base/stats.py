@@ -7,9 +7,9 @@ from config import STATS_VIDEO
 
 @app.on_message(filters.command("stats"))
 async def show_stats(client: Client, message):
-    group_count = group_log_db.count_documents({})
-    user_count = global_userinfo_db.count_documents({})
-    banned_count = global_ban_db.count_documents({})
+    group_count = await group_log_db.count_documents({})
+    user_count = await global_userinfo_db.count_documents({})
+    banned_count = await global_ban_db.count_documents({})
 
     caption = (
         f"📊 <b>Bot Statistics</b>\n\n"

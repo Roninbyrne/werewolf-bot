@@ -27,7 +27,7 @@ START_VIDEO = "https://unitedcamps.in/Images/file_11380.jpg"
 LOGGER_ID = -1002059639505
 
 # Owner ID for specific use
-OWNER_ID = int(getenv("OWNER_ID", 7394132959))
+OWNER_ID = 7394132959
 
 # Heroku deployment variables (used for updates/restarts)
 HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")

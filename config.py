@@ -41,7 +41,7 @@ LOGGER_ID = -1002059639505
 STATS_VIDEO = "https://unitedcamps.in/Images/file_5250.jpg"
 
 # Global ban channel ID where bot sends important gban and ungban info
-GBAN_ID = -1002059639505
+GBAN_LOGS = -1002059639505
 
 # Owner ID for specific use
 OWNER_ID = 7394132959

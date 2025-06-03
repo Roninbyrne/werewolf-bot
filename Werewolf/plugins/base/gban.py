@@ -2,7 +2,8 @@ from pyrogram import Client, filters
 from pyrogram.errors import UserAdminInvalid, ChatAdminRequired, UserNotParticipant
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Werewolf import app
-from Werewolf.plugins.base.db import group_log_db, global_ban_db
+from Werewolf.plugins.base.db import global_ban_db
+from Werewolf.core.bottrack import group_log_db
 from config import OWNER_ID, GBAN_LOGS
 import asyncio
 import time

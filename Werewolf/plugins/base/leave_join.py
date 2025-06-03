@@ -1,6 +1,7 @@
 from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.types import ChatMemberUpdated
+from pyrogram.errors import PeerIdInvalid, FloodWait
 from Werewolf.plugins.base.db import group_log_db
 from config import LOGGER_ID
 import asyncio
@@ -104,6 +105,15 @@ async def check_bot_removal():
                             await app.send_message(LOGGER_ID, text)
                     else:
                         print(f"[OK] Bot is still in group: {group_id}")
+                except PeerIdInvalid:
+                    print(f"[WARN] Invalid group ID (peer not found): {group_id}. Removing from DB.")
+                    await group_log_db.delete_one({"_id": group_id})
+                except KeyError:
+                    print(f"[WARN] Group not found in peer cache: {group_id}. Removing from DB.")
+                    await group_log_db.delete_one({"_id": group_id})
+                except FloodWait as e:
+                    print(f"[WAIT] Sleeping for {e.value} seconds due to FloodWait.")
+                    await asyncio.sleep(e.value)
                 except Exception as e:
                     print(f"[ERROR] Checking group {group_id} failed: {e}")
                     traceback.print_exc()
@@ -111,7 +121,6 @@ async def check_bot_removal():
         except Exception as e:
             print(f"[FATAL ERROR] in check_bot_removal loop: {e}")
             traceback.print_exc()
-
         await asyncio.sleep(10)
 
 

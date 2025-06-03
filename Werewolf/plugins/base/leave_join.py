@@ -1,4 +1,4 @@
-lfrom pyrogram import Client
+from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatMemberUpdated
 from Werewolf.plugins.base.db import group_log_db

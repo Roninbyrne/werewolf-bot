@@ -57,9 +57,8 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
 
 
 async def check_bot_removal():
-    await asyncio.sleep(10)
+    await asyncio.sleep(60)
     bot = await app.get_me()
-
     while True:
         cursor = group_log_db.find()
         async for group in cursor:
@@ -67,21 +66,22 @@ async def check_bot_removal():
             try:
                 member = await app.get_chat_member(group_id, bot.id)
                 if member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]:
-                    await group_log_db.delete_one({"_id": group_id})
-                    if await is_logging_enabled():
-                        text = (
-                            f"❌ <b>Bot removed from group</b>\n\n"
-                            f"📌 <b>Group Name:</b> {group.get('title', 'Unknown')}\n"
-                            f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-                            f"👤 <b>Username:</b> @{group.get('username') or 'None'}"
-                        )
+                    raise Exception()
+            except Exception:
+                await group_log_db.delete_one({"_id": group_id})
+                if await is_logging_enabled():
+                    text = (
+                        f"❌ <b>Bot removed from group</b>\n\n"
+                        f"📌 <b>Group Name:</b> {group.get('title', 'Unknown')}\n"
+                        f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
+                        f"👤 <b>Username:</b> @{group.get('username') or 'None'}"
+                    )
+                    try:
                         await app.send_message(LOGGER_ID, text)
-                else:
-                    print(f"[OK] Bot is still in group: {group_id}")
-            except Exception as e:
-                print(f"[WARN] Failed to check group {group_id}: {e}")
+                    except:
+                        pass
             await asyncio.sleep(1)
-        await asyncio.sleep(10)
+        await asyncio.sleep(300)
 
 
 def start_removal_monitor():

@@ -5,14 +5,12 @@ import config
 from ..logging import LOGGER
 
 app = Client(
-    name="Werewolf",
+    name="Security",
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN,
-    in_memory=True,
     parse_mode=ParseMode.HTML,
-    max_concurrent_transmissions=7,
-    enable_chat_member_updates=True
+    max_concurrent_transmissions=7
 )
 
 async def start_bot():

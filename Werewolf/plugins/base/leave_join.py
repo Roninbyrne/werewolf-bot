@@ -9,6 +9,8 @@ from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 @app.on_chat_member_updated()
 async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
+    print(f"[DEBUG] chat_member_updated event received for: {chat_member.chat.title}")
+
     bot_id = (await client.get_me()).id
     new_member = chat_member.new_chat_member
     old_member = chat_member.old_chat_member

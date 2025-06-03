@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
 db = mongo_client["store"]
 group_log_db = db["group_logs"]
+group_members_db = db["group_members"]
 
 
 @app.on_chat_member_updated()
@@ -45,6 +46,30 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 upsert=True
             )
             logger.info(f"✅ Group data stored/updated for: '{chat.title}' [ID: {chat.id}]")
+
+            logger.info(f"📥 Fetching visible members for group: '{chat.title}' [ID: {chat.id}] (admin: {group_data['is_admin']})")
+            visible_count = 0
+            async for member in client.get_chat_members(chat.id):
+                try:
+                    user = member.user
+                    member_data = {
+                        "group_id": chat.id,
+                        "user_id": user.id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "username": user.username,
+                        "status": member.status.value,
+                    }
+                    await group_members_db.update_one(
+                        {"group_id": chat.id, "user_id": user.id},
+                        {"$set": member_data},
+                        upsert=True
+                    )
+                    visible_count += 1
+                except Exception as user_err:
+                    logger.warning(f"⚠️ Failed to store user {member.user.id} in group '{chat.title}': {user_err}")
+            logger.info(f"✅ Stored {visible_count} visible members for group: '{chat.title}' [ID: {chat.id}]")
+
         else:
             logger.info(f"ℹ️ Bot status '{new_status}' in group '{chat.title}' [ID: {chat.id}] — ignored.")
 

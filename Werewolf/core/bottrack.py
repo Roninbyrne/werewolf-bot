@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
 db = mongo_client["store"]
-group_collection = db["groups"]
+group_log_db = db["group_logs"]
 
 
 @app.on_my_chat_member()
@@ -27,19 +27,17 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
         }
 
         try:
-            await group_collection.update_one(
+            await group_log_db.update_one(
                 {"_id": chat.id},
                 {"$set": group_data},
                 upsert=True
             )
-            logger.info(f"✅ Bot added/promoted in group: '{chat.title}' [ID: {chat.id}]. Data stored/updated.")
+            logger.info(f"Group: '{chat.title}' [ID: {chat.id}] stored/updated.")
         except Exception as e:
-            logger.error(f"❌ Error saving group data for '{chat.title}' [ID: {chat.id}]: {e}")
-
+            logger.error(f"DB error for group '{chat.title}' [ID: {chat.id}]: {e}")
     else:
-        logger.info(f"ℹ️ Bot status changed to '{new_status}' in '{chat.title}' [ID: {chat.id}] — no action taken.")
+        logger.info(f"Status '{new_status}' in group '{chat.title}' [ID: {chat.id}] — ignored.")
 
 
 if __name__ == "__main__":
-    logger.info("🚀 Bot is starting...")
     app.run()

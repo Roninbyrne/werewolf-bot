@@ -57,7 +57,7 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
 
 
 async def check_bot_removal():
-    await asyncio.sleep(180)
+    await asyncio.sleep(10)
     bot = await app.get_me()
 
     while True:
@@ -81,7 +81,7 @@ async def check_bot_removal():
             except Exception as e:
                 print(f"[WARN] Failed to check group {group_id}: {e}")
             await asyncio.sleep(1)
-        await asyncio.sleep(300)
+        await asyncio.sleep(10)
 
 
 def start_removal_monitor():

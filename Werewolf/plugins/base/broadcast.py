@@ -16,7 +16,7 @@ async def group_broadcast(client, message: Message):
     sent = 0
     failed = 0
 
-    groups = list(group_log_db.find())
+    groups = await group_log_db.find().to_list(length=None)
     total = len(groups)
     estimate = round(total * 0.8)
 
@@ -59,7 +59,7 @@ async def user_broadcast(client, message: Message):
     sent = 0
     failed = 0
 
-    users = list(global_userinfo_db.find())
+    users = await global_userinfo_db.find().to_list(length=None)
     total = len(users)
     estimate = round(total * 0.8)
 

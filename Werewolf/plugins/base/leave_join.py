@@ -1,4 +1,4 @@
-lfrom pyrogram import Client, filters
+from pyrogram import Client, filters
 from pyrogram.enums import ChatMemberStatus
 from Werewolf import app
 from pyrogram.types import ChatMemberUpdated

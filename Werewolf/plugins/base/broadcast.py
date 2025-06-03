@@ -3,7 +3,8 @@ import time
 from pyrogram import filters
 from pyrogram.types import Message
 from Werewolf import app
-from Werewolf.plugins.base.db import group_log_db, global_userinfo_db
+from Werewolf.plugins.base.db import global_userinfo_db
+from Werewolf.core.bottrack import group_log_db
 from config import LOGGER_ID, OWNER_ID
 
 

@@ -13,10 +13,13 @@ db = mongo_client["store"]
 group_log_db = db["group_logs"]
 group_members_db = db["group_members"]
 
-
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
     try:
+        if not update.new_chat_member or not update.new_chat_member.user:
+            logger.debug("Skipped update with no new_chat_member or user info.")
+            return
+
         bot_id = (await client.get_me()).id
         if update.new_chat_member.user.id != bot_id:
             logger.debug(f"Ignored update not related to the bot (User ID: {update.new_chat_member.user.id})")
@@ -75,7 +78,6 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 
     except Exception as e:
         logger.exception(f"❌ Unexpected error in status change handler: {e}")
-
 
 if __name__ == "__main__":
     logger.info("🚀 Bot is starting...")

@@ -4,7 +4,6 @@ from pyrogram.types import ChatMemberUpdated
 from Werewolf.plugins.base.db import group_log_db
 from config import LOGGER_ID
 import asyncio
-
 from Werewolf import app
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
@@ -79,7 +78,17 @@ async def check_bot_removal():
                 else:
                     print(f"[OK] Bot is still in group: {group_id}")
             except Exception as e:
-                print(f"[WARN] Failed to check group {group_id}: {e}")
+                if "Peer id invalid" in str(e):
+                    await group_log_db.delete_one({"_id": group_id})
+                    if await is_logging_enabled():
+                        text = (
+                            f"⚠️ <b>Bot removed from group (peer invalid)</b>\n\n"
+                            f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
+                            f"Reason: <i>Peer ID Invalid — cannot access group</i>"
+                        )
+                        await app.send_message(LOGGER_ID, text)
+                else:
+                    print(f"[WARN] Failed to check group {group_id}: {e}")
             await asyncio.sleep(1)
         await asyncio.sleep(10)
 

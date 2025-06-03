@@ -1,6 +1,7 @@
 import logging
 from Werewolf import app
 from pyrogram.types import Chat, ChatMemberUpdated
+from pyrogram.enums import ChatMemberStatus
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI
 
@@ -14,33 +15,43 @@ group_log_db = db["group_logs"]
 
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
-    if update.new_chat_member.user.id != (await client.get_me()).id:
-        return  # Ignore updates not about the bot itself
+    try:
+        bot_id = (await client.get_me()).id
+        if update.new_chat_member.user.id != bot_id:
+            logger.debug(f"Ignored update not related to the bot (User ID: {update.new_chat_member.user.id})")
+            return
 
-    chat: Chat = update.chat
-    new_status = update.new_chat_member.status
+        chat: Chat = update.chat
+        new_status = update.new_chat_member.status
 
-    if new_status in ("member", "administrator", "creator"):
-        group_data = {
-            "_id": chat.id,
-            "title": chat.title,
-            "username": chat.username,
-            "type": chat.type,
-            "is_admin": new_status in ("administrator", "creator"),
-        }
+        logger.info(f"Detected status change in group '{chat.title}' [ID: {chat.id}] to '{new_status}'")
 
-        try:
+        if new_status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.OWNER,
+        ):
+            group_data = {
+                "_id": chat.id,
+                "title": chat.title,
+                "username": chat.username,
+                "type": chat.type,
+                "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
+            }
+
             await group_log_db.update_one(
                 {"_id": chat.id},
                 {"$set": group_data},
                 upsert=True
             )
-            logger.info(f"Group: '{chat.title}' [ID: {chat.id}] stored/updated.")
-        except Exception as e:
-            logger.error(f"DB error for group '{chat.title}' [ID: {chat.id}]: {e}")
-    else:
-        logger.info(f"Status '{new_status}' in group '{chat.title}' [ID: {chat.id}] — ignored.")
+            logger.info(f"✅ Group data stored/updated for: '{chat.title}' [ID: {chat.id}]")
+        else:
+            logger.info(f"ℹ️ Bot status '{new_status}' in group '{chat.title}' [ID: {chat.id}] — ignored.")
+
+    except Exception as e:
+        logger.exception(f"❌ Unexpected error in status change handler: {e}")
 
 
 if __name__ == "__main__":
+    logger.info("🚀 Bot is starting...")
     app.run()

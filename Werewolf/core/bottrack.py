@@ -1,5 +1,5 @@
 import logging
-from werewolf import app
+from Werewolf import app
 from pyrogram.types import Chat, ChatMemberUpdated
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI

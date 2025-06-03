@@ -12,7 +12,7 @@ API_ID = 20948356
 API_HASH = "6b202043d2b3c4db3f4ebefb06f2df12"
 
 # Bot token from @BotFather
-BOT_TOKEN = "8118270568:AAH9fPWU10vGDMIzjhPhs5uwxqgCSLq5KDo"
+BOT_TOKEN = "8178979398:AAGdeZC2B8vqPBez0y2c0PWO9VSKLkJ2ZnU"
 
 # MongoDB connection string for storing user data, game state, etc.
 MONGO_DB_URI = (

@@ -1,5 +1,5 @@
 import logging
-from Werewolf import app
+from werewolf import app
 from pyrogram.types import Chat, ChatMemberUpdated
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI
@@ -12,8 +12,11 @@ db = mongo_client["store"]
 group_log_db = db["group_logs"]
 
 
-@app.on_my_chat_member()
+@app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
+    if update.new_chat_member.user.id != (await client.get_me()).id:
+        return  # Ignore updates not about the bot itself
+
     chat: Chat = update.chat
     new_status = update.new_chat_member.status
 

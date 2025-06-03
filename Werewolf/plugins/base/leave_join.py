@@ -1,6 +1,7 @@
-from pyrogram import Client, filters
+from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus
-from pyrogram.types import ChatMemberUpdated, ChatMemberUpdatedHandler
+from pyrogram.types import ChatMemberUpdated
+from pyrogram.handlers import ChatMemberUpdatedHandler
 
 from Werewolf import app
 from Werewolf.plugins.base.db import group_log_db

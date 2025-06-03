@@ -1,5 +1,5 @@
 from pyrogram import Client
-from pyrogram.enums import ChatMemberStatus
+from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.types import ChatMemberUpdated
 from Werewolf.plugins.base.db import group_log_db
 from config import LOGGER_ID
@@ -21,9 +21,13 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
     chat = chat_member.chat
     group_id = chat.id
 
+    if chat.type != ChatType.SUPERGROUP:
+        return
+
     if (
         old_member is None or old_member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]
     ) and new_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
+
         try:
             invite_link = await client.export_chat_invite_link(group_id)
         except Exception:

@@ -1,10 +1,11 @@
-from pyrogram import Client
+from pyrogram import Client, filters
 from pyrogram.enums import ChatMemberStatus
-from pyrogram.types import ChatMemberUpdated
+from pyrogram.types import ChatMemberUpdated, ChatMemberUpdatedHandler
+
 from Werewolf import app
 from Werewolf.plugins.base.db import group_log_db
 
-@app.on_my_chat_member()
+
 async def handle_bot_updates(client: Client, event: ChatMemberUpdated):
     chat_id = event.chat.id
     chat_title = event.chat.title or "Private Chat"
@@ -26,5 +27,5 @@ async def handle_bot_updates(client: Client, event: ChatMemberUpdated):
             {"$set": {"status": "removed"}}
         )
 
-if __name__ == "__main__":
-    app.run()
+
+app.add_handler(ChatMemberUpdatedHandler(handle_bot_updates))

@@ -26,11 +26,10 @@ async def confirm_restart_handler(client: Client, callback_query: CallbackQuery)
     await callback_query.message.delete()
     msg = await callback_query.message.reply_text("🔄 Restarting bot... Please wait.")
 
-    if is_logging_enabled():
+    if await is_logging_enabled():
         ist = pytz.timezone("Asia/Kolkata")
         time_now = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
         await client.send_message(LOGGER_ID, f"♻️ <b>Bot restarted at:</b> <code>{time_now} IST</code>")
-
     os.system(f"kill -9 {os.getpid()} && bash start")
 
 @app.on_callback_query(filters.user(OWNER_ID) & filters.regex("cancel_restart"))

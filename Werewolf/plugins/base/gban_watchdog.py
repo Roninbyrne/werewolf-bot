@@ -12,13 +12,13 @@ async def enforce_gban_on_join(client: Client, update: ChatMemberUpdated):
     user = update.new_chat_member.user
     chat = update.chat
 
-    data = global_ban_db.find_one({"_id": user.id})
+    data = await global_ban_db.find_one({"_id": user.id})
     if not data or chat.id not in data.get("held_in", []):
         return
 
     try:
         await client.ban_chat_member(chat.id, user.id)
-        global_ban_db.update_one(
+        await global_ban_db.update_one(
             {"_id": user.id},
             {"$pull": {"held_in": chat.id}}
         )

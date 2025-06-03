@@ -16,8 +16,7 @@ BOT_TOKEN = "8118270568:AAH9fPWU10vGDMIzjhPhs5uwxqgCSLq5KDo"
 
 # MongoDB connection string for storing user data, game state, etc.
 MONGO_DB_URI = (
-    "mongodb+srv://Yumi:Yumi@yumi.inctk.mongodb.net/storage"
-    "?retryWrites=true&w=majority&appName=Yumi"
+    "mongodb+srv://werewolf: werewolf@cluster0.bk5l4zz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 )
 
 # --------------start.py-------------

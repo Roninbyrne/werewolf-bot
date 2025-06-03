@@ -35,7 +35,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 "_id": chat.id,
                 "title": chat.title,
                 "username": chat.username,
-                "type": chat.type,
+                "type": chat.type.value,
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
             }
 

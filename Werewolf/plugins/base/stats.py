@@ -2,7 +2,8 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
 from Werewolf import app
-from Werewolf.plugins.base.db import group_log_db, global_userinfo_db, global_ban_db
+from Werewolf.plugins.base.db import global_userinfo_db, global_ban_db
+from Werewolf.core.bottrack import group_log_db
 from config import STATS_VIDEO
 
 @app.on_message(filters.command("stats"))

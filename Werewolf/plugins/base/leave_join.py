@@ -1,8 +1,9 @@
-from pyrogram import Client, filters
+from pyrogram import Client
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatMemberUpdated
 from Werewolf.plugins.base.db import group_log_db
-from config import LOGGER_ID, OWNER_ID
+from config import LOGGER_ID
+
 from Werewolf import app
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
@@ -52,33 +53,3 @@ async def log_group_events(client: Client, chat_member: ChatMemberUpdated):
                 f"👥 <b>Members:</b> {member_count}"
             )
             await client.send_message(LOGGER_ID, text)
-
-
-@app.on_message(filters.command("checkgroups") & filters.user(OWNER_ID))
-async def manual_check_groups(_, message):
-    bot = await app.get_me()
-    removed_count = 0
-
-    cursor = group_log_db.find()
-    async for group in cursor:
-        group_id = group["_id"]
-        try:
-            member = await app.get_chat_member(group_id, bot.id)
-            if member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.BANNED]:
-                raise Exception()
-        except Exception:
-            removed_count += 1
-            await group_log_db.delete_one({"_id": group_id})
-            if await is_logging_enabled():
-                text = (
-                    f"❌ <b>Bot removed from group</b>\n\n"
-                    f"📌 <b>Group Name:</b> {group.get('title', 'Unknown')}\n"
-                    f"🆔 <b>Group ID:</b> <code>{group_id}</code>\n"
-                    f"👤 <b>Username:</b> @{group.get('username') or 'None'}"
-                )
-                try:
-                    await app.send_message(LOGGER_ID, text)
-                except:
-                    pass
-
-    await message.reply_text(f"✅ Checked all groups. Removed from {removed_count} inactive groups.")

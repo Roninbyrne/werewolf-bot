@@ -87,42 +87,47 @@ async def verify_groups_command(client, message: Message):
         updated_groups = []
 
         logger.info(f"🔍 Starting group verification triggered by {message.from_user.id}")
-        async for dialog in client.get_dialogs():
-            chat = dialog.chat
-            if chat.type in ("group", "supergroup"):
-                try:
-                    member = await client.get_chat_member(chat.id, me.id)
-                    if member.status in (
-                        ChatMemberStatus.MEMBER,
-                        ChatMemberStatus.ADMINISTRATOR,
-                        ChatMemberStatus.OWNER,
-                    ):
-                        group_data = {
-                            "_id": chat.id,
-                            "title": chat.title,
-                            "username": chat.username,
-                            "type": chat.type.value,
-                            "is_admin": member.status in (
-                                ChatMemberStatus.ADMINISTRATOR,
-                                ChatMemberStatus.OWNER,
-                            ),
-                        }
-                        await group_log_db.update_one(
-                            {"_id": chat.id},
-                            {"$set": group_data},
-                            upsert=True
-                        )
-                        updated_groups.append(f"{chat.title} [`{chat.id}`]")
-                        logger.info(f"✅ Verified group: '{chat.title}' [ID: {chat.id}]")
-                except Exception as e:
-                    logger.warning(f"⚠️ Skipped group ID {chat.id} due to error: {e}")
-                    continue
+
+        async for group in group_log_db.find({}):
+            chat_id = group["_id"]
+            try:
+                chat = await client.get_chat(chat_id)
+                member = await client.get_chat_member(chat_id, me.id)
+
+                if member.status in (
+                    ChatMemberStatus.MEMBER,
+                    ChatMemberStatus.ADMINISTRATOR,
+                    ChatMemberStatus.OWNER,
+                ):
+                    group_data = {
+                        "_id": chat.id,
+                        "title": chat.title,
+                        "username": chat.username,
+                        "type": chat.type.value,
+                        "is_admin": member.status in (
+                            ChatMemberStatus.ADMINISTRATOR,
+                            ChatMemberStatus.OWNER,
+                        ),
+                    }
+                    await group_log_db.update_one(
+                        {"_id": chat.id},
+                        {"$set": group_data},
+                        upsert=True
+                    )
+                    updated_groups.append(f"{chat.title} [`{chat.id}`]")
+                    logger.info(f"✅ Verified group: '{chat.title}' [ID: {chat.id}]")
+                else:
+                    logger.info(f"❌ Bot is no longer a member/admin in group ID: {chat_id}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Skipped group ID {chat_id} due to error: {e}")
+                continue
 
         if updated_groups:
             group_list_text = "\n".join(updated_groups)
             reply_text = f"✅ Verified and updated {len(updated_groups)} groups:\n\n{group_list_text}"
         else:
-            reply_text = "ℹ️ No groups found or updated."
+            reply_text = "ℹ️ No valid groups found in MongoDB or bot is no longer a member."
 
         await message.reply_text(reply_text)
         logger.info("✅ Group verification completed successfully.")

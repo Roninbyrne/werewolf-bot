@@ -105,7 +105,9 @@ async def verify_all_groups_from_db(client):
                     continue
 
                 raw_chat = result.chats[0]
-                chat = await Chat._parse(client, raw_chat)
+                chat_id = int("-100" + str(raw_chat.id))
+                await client.send_chat_action(chat_id, ChatAction.TYPING)
+                chat = await client.get_chat(chat_id)
                 member = await client.get_chat_member(chat.id, me.id)
 
                 group["access_hash"] = getattr(raw_chat, "access_hash", group.get("access_hash"))

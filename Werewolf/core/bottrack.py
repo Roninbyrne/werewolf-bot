@@ -3,6 +3,7 @@ from Werewolf import app
 from pyrogram.types import Chat, ChatMemberUpdated, Message
 from pyrogram.enums import ChatMemberStatus
 from pyrogram import filters
+from pyrogram.errors import PeerIdInvalid
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID
 
@@ -78,6 +79,7 @@ async def verify_all_groups_from_db(client):
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
         try:
+            await client.send_chat_action(chat_id, "typing")
             chat = await client.get_chat(chat_id)
             member = await client.get_chat_member(chat_id, me.id)
 
@@ -126,6 +128,9 @@ async def verify_all_groups_from_db(client):
                 updated_groups.append(f"{chat.title} [`{chat.id}`]")
             else:
                 logger.info(f"Bot not present in group {chat_id}, skipping.")
+        except PeerIdInvalid:
+            logger.warning(f"PeerIdInvalid for group {chat_id}, skipping.")
+            continue
         except Exception as e:
             logger.warning(f"Error verifying group {chat_id}: {e}")
             continue

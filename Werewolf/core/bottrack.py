@@ -1,7 +1,7 @@
 import logging
 from Werewolf import app
 from pyrogram.types import Chat, ChatMemberUpdated, Message
-from pyrogram.enums import ChatMemberStatus
+from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram import filters
 from pyrogram.errors import PeerIdInvalid
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -79,7 +79,7 @@ async def verify_all_groups_from_db(client):
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
         try:
-            await client.send_chat_action(chat_id, "typing")
+            await client.send_chat_action(chat_id, ChatAction.TYPING)
             chat = await client.get_chat(chat_id)
             member = await client.get_chat_member(chat_id, me.id)
 

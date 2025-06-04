@@ -58,7 +58,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                         "first_name": user.first_name,
                         "last_name": user.last_name,
                         "username": user.username,
-                        "status": member.status.value,
+                        "status": getattr(member.status, "value", member.status),
                     }
                     await group_members_db.update_one(
                         {"group_id": chat.id, "user_id": user.id},
@@ -114,7 +114,7 @@ async def verify_all_groups_from_db(client):
                             "first_name": user.first_name,
                             "last_name": user.last_name,
                             "username": user.username,
-                            "status": member.status.value,
+                            "status": getattr(member.status, "value", member.status),
                         }
                         await group_members_db.update_one(
                             {"group_id": chat.id, "user_id": user.id},

@@ -154,18 +154,3 @@ async def verify_all_groups_from_db(client):
             logger.info(f"Bot not present in group {chat_id}, skipping.")
 
     return updated_groups
-
-@app.on_message(filters.command("verifygroups") & filters.user(OWNER_ID))
-async def verify_groups_command(client, message: Message):
-    try:
-        logger.info(f"Manual verify triggered by {message.from_user.id}")
-        updated_groups = await verify_all_groups_from_db(client)
-        if updated_groups:
-            reply_text = f"Verified {len(updated_groups)} groups:\n\n" + "\n".join(updated_groups)
-        else:
-            reply_text = "No valid groups found or bot not a member."
-        await message.reply_text(reply_text)
-        logger.info("Manual group verification completed.")
-    except Exception as e:
-        logger.exception("Error during manual verify.")
-        await message.reply_text(f"Error verifying groups: {e}")

@@ -29,7 +29,11 @@ async def confirm_restart_handler(client: Client, callback_query: CallbackQuery)
     if await is_logging_enabled():
         ist = pytz.timezone("Asia/Kolkata")
         time_now = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
-        await client.send_message(LOGGER_ID, f"♻️ <b>Bot restarted at:</b> <code>{time_now} IST</code>")
+        await client.send_message(
+            LOGGER_ID,
+            f"♻️ <b>Bot is restarting...</b>\n⏰ <b>Time:</b> <code>{time_now} IST</code>\n🔍 Will reverify MongoDB group data on boot."
+        )
+
     os.system(f"kill -9 {os.getpid()} && bash start")
 
 @app.on_callback_query(filters.user(OWNER_ID) & filters.regex("cancel_restart"))

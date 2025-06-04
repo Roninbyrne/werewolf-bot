@@ -87,32 +87,40 @@ async def verify_all_groups_from_db(client):
         chat_id = group["_id"]
         raw_access_hash = group.get("access_hash")
         access_hash = int(raw_access_hash) if raw_access_hash is not None else None
-        try:
-            if access_hash is not None:
-                try:
-                    channel_id = int(str(chat_id).replace("-100", ""))
-                    input_channel = InputChannel(channel_id=channel_id, access_hash=access_hash)
-                    result = await client.invoke(GetChannels(id=[input_channel]))
-                    if not result.chats:
-                        continue
+
+        chat = None
+        member = None
+        used_fallback = False
+
+        if access_hash:
+            try:
+                channel_id = int(str(chat_id).replace("-100", ""))
+                input_channel = InputChannel(channel_id=channel_id, access_hash=access_hash)
+                result = await client.invoke(GetChannels(id=[input_channel]))
+                if result.chats:
                     raw_chat = result.chats[0]
                     chat = await client.get_chat(raw_chat.id)
                     chat_id = chat.id
                     member = await client.get_chat_member(chat_id, me.id)
-                except Exception as e:
-                    logger.warning(f"Failed to recover group {chat_id} with access_hash: {e}")
-                    continue
-            else:
-                try:
-                    await client.send_chat_action(chat_id, ChatAction.TYPING)
-                    chat = await client.get_chat(chat_id)
-                    member = await client.get_chat_member(chat_id, me.id)
-                except PeerIdInvalid:
-                    continue
-        except Exception as e:
-            continue
+            except Exception:
+                used_fallback = True
 
-        if member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
+        if not chat:
+            try:
+                await client.send_chat_action(chat_id, ChatAction.TYPING)
+                chat = await client.get_chat(chat_id)
+                member = await client.get_chat_member(chat_id, me.id)
+            except PeerIdInvalid:
+                if used_fallback or access_hash:
+                    logger.warning(f"❌ Failed to recover group {chat_id} — both access_hash and fallback failed.")
+                continue
+            except Exception:
+                continue
+
+        if used_fallback:
+            logger.info(f"🔁 Recovered group {chat_id} via fallback (access_hash invalid or expired).")
+
+        if member and member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             group_data = {
                 "_id": chat.id,
                 "title": chat.title,
@@ -144,8 +152,10 @@ async def verify_all_groups_from_db(client):
                     count += 1
                 except Exception as e:
                     logger.warning(f"Failed to store user in group {chat.id}: {e}")
-            logger.info(f"Verified {chat.title} [{chat.id}] with {count} members")
+
+            logger.info(f"✅ Verified {chat.title} [{chat.id}] with {count} members")
             updated_groups.append(f"{chat.title} [`{chat.id}`]")
+
     return updated_groups
 
 async def get_all_groups_summary():

@@ -1,16 +1,17 @@
 import logging
 from Werewolf import app
+from pyrogram import filters
 from pyrogram.types import Chat, ChatMemberUpdated, Message
 from pyrogram.enums import ChatMemberStatus, ChatAction
-from pyrogram import filters
 from pyrogram.errors import PeerIdInvalid
+from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.functions.messages import GetChats
-from pyrogram.raw.types import InputPeerChannel
+from pyrogram.raw.types import InputPeerChannel, InputChannel
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("Werewolf.core.bottrack")
 
 mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
 db = mongo_client["store"]
@@ -30,26 +31,29 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
 
-        if new_status in (
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.OWNER,
-        ):
+        if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
+            channel_id = int(str(chat.id).replace("-100", ""))
+            access_hash = None
+            try:
+                input_channel = InputChannel(channel_id=channel_id, access_hash=0)
+                result = await client.invoke(GetChannels(id=[input_channel]))
+                if result.chats:
+                    raw_chat = result.chats[0]
+                    access_hash = getattr(raw_chat, "access_hash", None)
+            except Exception as e:
+                logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
+
             group_data = {
                 "_id": chat.id,
                 "title": chat.title,
                 "username": chat.username,
                 "type": chat.type.value,
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
-                "access_hash": getattr(chat, "access_hash", None),
+                "access_hash": access_hash,
             }
 
-            await group_log_db.update_one(
-                {"_id": chat.id},
-                {"$set": group_data},
-                upsert=True
-            )
-            logger.info(f"Stored group: {chat.title} [{chat.id}]")
+            logger.info(f"Bot added/promoted in group: {group_data}")
+            await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
 
             count = 0
             async for member in client.get_chat_members(chat.id):
@@ -95,7 +99,7 @@ async def verify_all_groups_from_db(client):
                     channel_id=int(str(chat_id).replace("-100", "")),
                     access_hash=group["access_hash"]
                 )
-                await client.invoke(GetChats(id=[peer.channel_id]))
+                await client.invoke(GetChats(id=[peer]))
                 chat = await client.get_chat(peer)
                 member = await client.get_chat_member(peer, me.id)
             except Exception as e:
@@ -105,11 +109,7 @@ async def verify_all_groups_from_db(client):
             logger.warning(f"Error verifying group {chat_id}: {e}")
             continue
 
-        if member.status in (
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.OWNER,
-        ):
+        if member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             group_data = {
                 "_id": chat.id,
                 "title": chat.title,
@@ -121,11 +121,9 @@ async def verify_all_groups_from_db(client):
                 ),
                 "access_hash": getattr(chat, "access_hash", None),
             }
-            await group_log_db.update_one(
-                {"_id": chat.id},
-                {"$set": group_data},
-                upsert=True
-            )
+
+            logger.info(f"Verifying group from DB: {group_data}")
+            await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
 
             count = 0
             async for member in client.get_chat_members(chat.id):
@@ -159,12 +157,10 @@ async def verify_groups_command(client, message: Message):
     try:
         logger.info(f"Manual verify triggered by {message.from_user.id}")
         updated_groups = await verify_all_groups_from_db(client)
-
         if updated_groups:
             reply_text = f"Verified {len(updated_groups)} groups:\n\n" + "\n".join(updated_groups)
         else:
             reply_text = "No valid groups found or bot not a member."
-
         await message.reply_text(reply_text)
         logger.info("Manual group verification completed.")
     except Exception as e:

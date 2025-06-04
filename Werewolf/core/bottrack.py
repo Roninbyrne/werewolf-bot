@@ -22,11 +22,14 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
     try:
         if not update.new_chat_member or not update.new_chat_member.user:
             return
+
         bot_id = (await client.get_me()).id
         if update.new_chat_member.user.id != bot_id:
             return
+
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
+
         if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             channel_id = int(str(chat.id).replace("-100", ""))
             access_hash = None
@@ -38,6 +41,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                     access_hash = getattr(raw_chat, "access_hash", None)
             except Exception as e:
                 logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
+
             old_data = await group_log_db.find_one({"_id": chat.id})
             group_data = {
                 "_id": chat.id,
@@ -47,8 +51,10 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
                 "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
             }
+
             logger.info(f"Bot added/promoted in group: {group_data}")
             await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
+
             count = 0
             async for member in client.get_chat_members(chat.id):
                 try:
@@ -76,6 +82,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
     updated_groups = []
+
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
         raw_access_hash = group.get("access_hash")
@@ -104,6 +111,7 @@ async def verify_all_groups_from_db(client):
                     continue
         except Exception as e:
             continue
+
         if member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             group_data = {
                 "_id": chat.id,
@@ -113,7 +121,9 @@ async def verify_all_groups_from_db(client):
                 "is_admin": member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
                 "access_hash": access_hash,
             }
+
             await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
+
             count = 0
             async for member in client.get_chat_members(chat.id):
                 try:
@@ -143,12 +153,16 @@ async def get_all_groups_summary():
         group_count = await group_log_db.count_documents({})
         groups = group_log_db.find({})
         group_summaries = []
+
         async for group in groups:
             name = group.get("title", "Unknown Title")
             chat_id = group.get("_id")
             member_count = await group_members_db.count_documents({"group_id": chat_id})
-            group_summaries.append(f"{name} [`{chat_id}`] - 👤 {member_count} members")
-        logger.info(f"Total Groups in DB: {group_count}")
+            summary = f"{name} [`{chat_id}`] - 👤 {member_count} members"
+            group_summaries.append(summary)
+            logger.info(f"[DUB] {summary}")
+
+        logger.info(f"Total Groups: {group_count}")
         return group_count, group_summaries
     except Exception as e:
         logger.exception("Failed to fetch groups summary from DB")

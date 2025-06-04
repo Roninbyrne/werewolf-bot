@@ -1,11 +1,19 @@
 import asyncio
 import importlib
 from pyrogram import idle
-
 from Werewolf import LOGGER, app, start_bot
 from Werewolf.plugins import ALL_MODULES
 from Werewolf.plugins.bottrack import verify_groups_command
 from config import OWNER_ID
+
+class DummyUser:
+    id = OWNER_ID
+
+class DummyMessage:
+    from_user = DummyUser()
+
+    async def reply_text(self, *args, **kwargs):
+        pass
 
 async def init():
     await start_bot()
@@ -15,11 +23,7 @@ async def init():
     LOGGER("Werewolf").info("Werewolf Game Bot Started Successfully.")
 
     try:
-        from pyrogram.types import User
-        dummy_message = type("Dummy", (), {
-            "from_user": type("FromUser", (), {"id": OWNER_ID}),
-            "reply_text": lambda *args, **kwargs: None
-        })()
+        dummy_message = DummyMessage()
         await verify_groups_command(app, dummy_message)
     except Exception as e:
         LOGGER("Werewolf").warning(f"Failed to verify groups on startup: {e}")

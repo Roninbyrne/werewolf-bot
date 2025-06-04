@@ -87,7 +87,7 @@ async def verify_all_groups_from_db(client):
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
         try:
-            if "access_hash" in group and group["access_hash"]:
+            if group.get("access_hash"):
                 try:
                     input_peer = InputPeerChannel(
                         channel_id=int(str(chat_id).replace("-100", "")),
@@ -107,7 +107,6 @@ async def verify_all_groups_from_db(client):
                 except PeerIdInvalid:
                     logger.warning(f"Group {chat_id} is missing access_hash, skipping.")
                     continue
-
         except Exception as e:
             logger.warning(f"Error verifying group {chat_id}: {e}")
             continue
@@ -118,10 +117,7 @@ async def verify_all_groups_from_db(client):
                 "title": chat.title,
                 "username": chat.username,
                 "type": chat.type.value,
-                "is_admin": member.status in (
-                    ChatMemberStatus.ADMINISTRATOR,
-                    ChatMemberStatus.OWNER,
-                ),
+                "is_admin": member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
                 "access_hash": group.get("access_hash"),
             }
 

@@ -49,7 +49,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 "username": chat.username,
                 "type": chat.type.value,
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
-                "access_hash": access_hash or (old_data.get("access_hash") if old_data else None),
+                "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
             }
 
             logger.info(f"Bot added/promoted in group: {group_data}")
@@ -79,19 +79,19 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
 
-
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
     updated_groups = []
 
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
+        access_hash = group.get("access_hash")
         try:
-            if group.get("access_hash"):
+            if access_hash is not None:
                 try:
                     input_peer = InputPeerChannel(
                         channel_id=int(str(chat_id).replace("-100", "")),
-                        access_hash=group["access_hash"]
+                        access_hash=int(access_hash)
                     )
                     chat = await client.get_chat(input_peer)
                     chat_id = chat.id
@@ -118,7 +118,7 @@ async def verify_all_groups_from_db(client):
                 "username": chat.username,
                 "type": chat.type.value,
                 "is_admin": member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
-                "access_hash": group.get("access_hash"),
+                "access_hash": int(access_hash) if access_hash else None,
             }
 
             logger.info(f"Verifying group from DB: {group_data}")
@@ -150,7 +150,6 @@ async def verify_all_groups_from_db(client):
             logger.info(f"Bot not present in group {chat_id}, skipping.")
 
     return updated_groups
-
 
 @app.on_message(filters.command("verifygroups") & filters.user(OWNER_ID))
 async def verify_groups_command(client, message: Message):

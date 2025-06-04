@@ -5,8 +5,7 @@ from pyrogram.types import Chat, ChatMemberUpdated, Message
 from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
-from pyrogram.raw.functions.messages import GetChats
-from pyrogram.raw.types import InputPeerChannel, InputChannel
+from pyrogram.raw.types import InputChannel
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID
 
@@ -96,16 +95,24 @@ async def verify_all_groups_from_db(client):
                 logger.warning(f"Group {chat_id} is missing access_hash, skipping.")
                 continue
             try:
-                peer = InputPeerChannel(
+                input_channel = InputChannel(
                     channel_id=int(str(chat_id).replace("-100", "")),
                     access_hash=group["access_hash"]
                 )
-                await client.invoke(GetChats(id=[peer]))
-                chat = await client.get_chat(peer)
-                member = await client.get_chat_member(peer, me.id)
+                result = await client.invoke(GetChannels(id=[input_channel]))
+                if not result.chats:
+                    logger.warning(f"No chat found using access_hash for group {chat_id}")
+                    continue
+
+                raw_chat = result.chats[0]
+                chat = await client.get_chat(chat_id)
+                member = await client.get_chat_member(chat_id, me.id)
+
+                group["access_hash"] = getattr(raw_chat, "access_hash", group.get("access_hash"))
             except Exception as e:
                 logger.warning(f"Failed to recover group {chat_id} with access_hash: {e}")
                 continue
+
         except Exception as e:
             logger.warning(f"Error verifying group {chat_id}: {e}")
             continue
@@ -120,7 +127,7 @@ async def verify_all_groups_from_db(client):
                     ChatMemberStatus.ADMINISTRATOR,
                     ChatMemberStatus.OWNER,
                 ),
-                "access_hash": getattr(chat, "access_hash", None) or group.get("access_hash"),
+                "access_hash": group.get("access_hash"),
             }
 
             logger.info(f"Verifying group from DB: {group_data}")

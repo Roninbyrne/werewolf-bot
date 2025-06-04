@@ -39,6 +39,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 "username": chat.username,
                 "type": chat.type.value,
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
+                "access_hash": getattr(chat, "access_hash", None),
             }
 
             await group_log_db.update_one(
@@ -97,6 +98,7 @@ async def verify_all_groups_from_db(client):
                         ChatMemberStatus.ADMINISTRATOR,
                         ChatMemberStatus.OWNER,
                     ),
+                    "access_hash": getattr(chat, "access_hash", None),
                 }
                 await group_log_db.update_one(
                     {"_id": chat.id},

@@ -15,9 +15,8 @@ API_HASH = "6b202043d2b3c4db3f4ebefb06f2df12"
 BOT_TOKEN = "8118270568:AAH9fPWU10vGDMIzjhPhs5uwxqgCSLq5KDo"
 
 # MongoDB connection string for storing user data, game state, etc.
-MONGO_DB_URI = (
-    "mongodb+srv://werewolf:werewolf@cluster0.bk5l4zz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-)
+
+MONGO_DB_URI = "mongodb+srv://Yumi:Yumi@yumi.inctk.mongodb.net/?retryWrites=true&w=majority&appName=Yumi"
 
 # --------------start.py-------------
 

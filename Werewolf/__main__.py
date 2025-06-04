@@ -3,7 +3,7 @@ import importlib
 from pyrogram import idle
 from Werewolf import LOGGER, app, start_bot
 from Werewolf.plugins import ALL_MODULES
-from Werewolf.plugins.bottrack import verify_groups_command
+from Werewolf.core.bottrack import verify_groups_command
 from config import OWNER_ID
 
 class DummyUser:

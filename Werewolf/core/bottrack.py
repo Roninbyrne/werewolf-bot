@@ -22,14 +22,11 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
     try:
         if not update.new_chat_member or not update.new_chat_member.user:
             return
-
         bot_id = (await client.get_me()).id
         if update.new_chat_member.user.id != bot_id:
             return
-
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
-
         if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             channel_id = int(str(chat.id).replace("-100", ""))
             access_hash = None
@@ -41,7 +38,6 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                     access_hash = getattr(raw_chat, "access_hash", None)
             except Exception as e:
                 logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
-
             old_data = await group_log_db.find_one({"_id": chat.id})
             group_data = {
                 "_id": chat.id,
@@ -51,10 +47,8 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
                 "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
             }
-
             logger.info(f"Bot added/promoted in group: {group_data}")
             await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
-
             count = 0
             async for member in client.get_chat_members(chat.id):
                 try:
@@ -82,7 +76,6 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
     updated_groups = []
-
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
         raw_access_hash = group.get("access_hash")
@@ -94,7 +87,6 @@ async def verify_all_groups_from_db(client):
                     input_channel = InputChannel(channel_id=channel_id, access_hash=access_hash)
                     result = await client.invoke(GetChannels(id=[input_channel]))
                     if not result.chats:
-                        logger.warning(f"No result from GetChannels for {chat_id}")
                         continue
                     raw_chat = result.chats[0]
                     chat = await client.get_chat(raw_chat.id)
@@ -109,12 +101,9 @@ async def verify_all_groups_from_db(client):
                     chat = await client.get_chat(chat_id)
                     member = await client.get_chat_member(chat_id, me.id)
                 except PeerIdInvalid:
-                    logger.warning(f"Group {chat_id} is missing access_hash, skipping.")
                     continue
         except Exception as e:
-            logger.warning(f"Error verifying group {chat_id}: {e}")
             continue
-
         if member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             group_data = {
                 "_id": chat.id,
@@ -124,10 +113,7 @@ async def verify_all_groups_from_db(client):
                 "is_admin": member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
                 "access_hash": access_hash,
             }
-
-            logger.info(f"Verifying group from DB: {group_data}")
             await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
-
             count = 0
             async for member in client.get_chat_members(chat.id):
                 try:
@@ -150,7 +136,26 @@ async def verify_all_groups_from_db(client):
                     logger.warning(f"Failed to store user in group {chat.id}: {e}")
             logger.info(f"Verified {chat.title} [{chat.id}] with {count} members")
             updated_groups.append(f"{chat.title} [`{chat.id}`]")
-        else:
-            logger.info(f"Bot not present in group {chat_id}, skipping.")
-
     return updated_groups
+
+async def get_all_groups_summary():
+    try:
+        group_count = await group_log_db.count_documents({})
+        groups = group_log_db.find({})
+        group_summaries = []
+        async for group in groups:
+            name = group.get("title", "Unknown Title")
+            chat_id = group.get("_id")
+            member_count = await group_members_db.count_documents({"group_id": chat_id})
+            group_summaries.append(f"{name} [`{chat_id}`] - 👤 {member_count} members")
+        logger.info(f"Total Groups in DB: {group_count}")
+        return group_count, group_summaries
+    except Exception as e:
+        logger.exception("Failed to fetch groups summary from DB")
+        return 0, []
+
+@app.on_message(filters.command("groupstats") & filters.user(OWNER_ID))
+async def send_group_stats(client, message: Message):
+    count, summaries = await get_all_groups_summary()
+    text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
+    await message.reply_text(text or "No groups found.")

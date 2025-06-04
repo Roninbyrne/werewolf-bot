@@ -43,13 +43,14 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
             except Exception as e:
                 logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
 
+            old_data = await group_log_db.find_one({"_id": chat.id})
             group_data = {
                 "_id": chat.id,
                 "title": chat.title,
                 "username": chat.username,
                 "type": chat.type.value,
                 "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
-                "access_hash": access_hash,
+                "access_hash": access_hash or (old_data.get("access_hash") if old_data else None),
             }
 
             logger.info(f"Bot added/promoted in group: {group_data}")
@@ -119,7 +120,7 @@ async def verify_all_groups_from_db(client):
                     ChatMemberStatus.ADMINISTRATOR,
                     ChatMemberStatus.OWNER,
                 ),
-                "access_hash": getattr(chat, "access_hash", None),
+                "access_hash": getattr(chat, "access_hash", None) or group.get("access_hash"),
             }
 
             logger.info(f"Verifying group from DB: {group_data}")

@@ -5,7 +5,7 @@ from pyrogram.types import Chat, ChatMemberUpdated, Message
 from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
-from pyrogram.raw.types import InputChannel
+from pyrogram.raw.types import InputChannel, InputPeerChannel
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID
 
@@ -79,6 +79,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
 
+
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
     updated_groups = []
@@ -86,34 +87,26 @@ async def verify_all_groups_from_db(client):
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
         try:
-            await client.send_chat_action(chat_id, ChatAction.TYPING)
-            chat = await client.get_chat(chat_id)
-            member = await client.get_chat_member(chat_id, me.id)
-
-        except PeerIdInvalid:
-            if "access_hash" not in group or not group["access_hash"]:
-                logger.warning(f"Group {chat_id} is missing access_hash, skipping.")
-                continue
-            try:
-                input_channel = InputChannel(
-                    channel_id=int(str(chat_id).replace("-100", "")),
-                    access_hash=group["access_hash"]
-                )
-                result = await client.invoke(GetChannels(id=[input_channel]))
-                if not result.chats:
-                    logger.warning(f"No chat found using access_hash for group {chat_id}")
+            if "access_hash" in group and group["access_hash"]:
+                try:
+                    input_peer = InputPeerChannel(
+                        channel_id=int(str(chat_id).replace("-100", "")),
+                        access_hash=group["access_hash"]
+                    )
+                    chat = await client.get_chat(input_peer)
+                    chat_id = chat.id
+                    member = await client.get_chat_member(chat_id, me.id)
+                except Exception as e:
+                    logger.warning(f"Failed to recover group {chat_id} with access_hash: {e}")
                     continue
-
-                raw_chat = result.chats[0]
-                chat_id = int("-100" + str(raw_chat.id))
-                await client.send_chat_action(chat_id, ChatAction.TYPING)
-                chat = await client.get_chat(chat_id)
-                member = await client.get_chat_member(chat.id, me.id)
-
-                group["access_hash"] = getattr(raw_chat, "access_hash", group.get("access_hash"))
-            except Exception as e:
-                logger.warning(f"Failed to recover group {chat_id} with access_hash: {e}")
-                continue
+            else:
+                try:
+                    await client.send_chat_action(chat_id, ChatAction.TYPING)
+                    chat = await client.get_chat(chat_id)
+                    member = await client.get_chat_member(chat_id, me.id)
+                except PeerIdInvalid:
+                    logger.warning(f"Group {chat_id} is missing access_hash, skipping.")
+                    continue
 
         except Exception as e:
             logger.warning(f"Error verifying group {chat_id}: {e}")
@@ -161,6 +154,7 @@ async def verify_all_groups_from_db(client):
             logger.info(f"Bot not present in group {chat_id}, skipping.")
 
     return updated_groups
+
 
 @app.on_message(filters.command("verifygroups") & filters.user(OWNER_ID))
 async def verify_groups_command(client, message: Message):

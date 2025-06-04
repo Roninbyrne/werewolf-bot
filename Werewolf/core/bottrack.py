@@ -32,7 +32,8 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
             ChatMemberStatus.ADMINISTRATOR,
             ChatMemberStatus.OWNER,
         ):
-            await client.get_dialogs()  # Warm up cache
+            async for _ in client.get_dialogs():
+                break
 
             group_data = {
                 "_id": chat.id,
@@ -77,7 +78,8 @@ async def verify_all_groups_from_db(client):
     me = await client.get_me()
     updated_groups = []
 
-    await client.get_dialogs()  # Warm up cache
+    async for _ in client.get_dialogs():
+        break
 
     async for group in group_log_db.find({}):
         chat_id = group["_id"]

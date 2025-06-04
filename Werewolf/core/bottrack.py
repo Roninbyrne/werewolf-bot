@@ -5,7 +5,7 @@ from pyrogram.types import Chat, ChatMemberUpdated, Message
 from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
-from pyrogram.raw.types import InputChannel, InputPeerChannel
+from pyrogram.raw.types import InputChannel
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID
 
@@ -90,11 +90,14 @@ async def verify_all_groups_from_db(client):
         try:
             if access_hash is not None:
                 try:
-                    input_peer = InputPeerChannel(
-                        channel_id=int(str(chat_id).replace("-100", "")),
-                        access_hash=access_hash
-                    )
-                    chat = await client.get_chat(input_peer)
+                    channel_id = int(str(chat_id).replace("-100", ""))
+                    input_channel = InputChannel(channel_id=channel_id, access_hash=access_hash)
+                    result = await client.invoke(GetChannels(id=[input_channel]))
+                    if not result.chats:
+                        logger.warning(f"No result from GetChannels for {chat_id}")
+                        continue
+                    raw_chat = result.chats[0]
+                    chat = await client.get_chat(raw_chat.id)
                     chat_id = chat.id
                     member = await client.get_chat_member(chat_id, me.id)
                 except Exception as e:

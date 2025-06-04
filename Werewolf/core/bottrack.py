@@ -173,3 +173,10 @@ async def send_group_stats(client, message: Message):
     count, summaries = await get_all_groups_summary()
     text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
     await message.reply_text(text or "No groups found.")
+
+
+async def verify_groups_command(client, message: Message):
+    updated_groups = await verify_all_groups_from_db(client)
+    text = "✅ Verified Groups:\n\n" + "\n".join(updated_groups) if updated_groups else "No groups verified."
+    if message:
+        await message.reply_text(text)

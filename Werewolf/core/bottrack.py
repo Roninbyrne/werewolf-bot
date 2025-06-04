@@ -4,6 +4,8 @@ from pyrogram.types import Chat, ChatMemberUpdated, Message
 from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram import filters
 from pyrogram.errors import PeerIdInvalid
+from pyrogram.raw.functions.messages import GetChats
+from pyrogram.raw.types import InputPeerChannel
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID
 
@@ -84,58 +86,71 @@ async def verify_all_groups_from_db(client):
             chat = await client.get_chat(chat_id)
             member = await client.get_chat_member(chat_id, me.id)
 
-            if member.status in (
-                ChatMemberStatus.MEMBER,
-                ChatMemberStatus.ADMINISTRATOR,
-                ChatMemberStatus.OWNER,
-            ):
-                group_data = {
-                    "_id": chat.id,
-                    "title": chat.title,
-                    "username": chat.username,
-                    "type": chat.type.value,
-                    "is_admin": member.status in (
-                        ChatMemberStatus.ADMINISTRATOR,
-                        ChatMemberStatus.OWNER,
-                    ),
-                    "access_hash": getattr(chat, "access_hash", None),
-                }
-                await group_log_db.update_one(
-                    {"_id": chat.id},
-                    {"$set": group_data},
-                    upsert=True
-                )
-
-                count = 0
-                async for member in client.get_chat_members(chat.id):
-                    try:
-                        user = member.user
-                        member_data = {
-                            "group_id": chat.id,
-                            "user_id": user.id,
-                            "first_name": user.first_name,
-                            "last_name": user.last_name,
-                            "username": user.username,
-                            "status": getattr(member.status, "value", member.status),
-                        }
-                        await group_members_db.update_one(
-                            {"group_id": chat.id, "user_id": user.id},
-                            {"$set": member_data},
-                            upsert=True
-                        )
-                        count += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to store user in group {chat.id}: {e}")
-                logger.info(f"Verified {chat.title} [{chat.id}] with {count} members")
-                updated_groups.append(f"{chat.title} [`{chat.id}`]")
-            else:
-                logger.info(f"Bot not present in group {chat_id}, skipping.")
         except PeerIdInvalid:
-            logger.warning(f"PeerIdInvalid for group {chat_id}, skipping.")
-            continue
+            if "access_hash" not in group or not group["access_hash"]:
+                logger.warning(f"Group {chat_id} is missing access_hash, skipping.")
+                continue
+            try:
+                peer = InputPeerChannel(
+                    channel_id=int(str(chat_id).replace("-100", "")),
+                    access_hash=group["access_hash"]
+                )
+                await client.invoke(GetChats(id=[peer.channel_id]))
+                chat = await client.get_chat(peer)
+                member = await client.get_chat_member(peer, me.id)
+            except Exception as e:
+                logger.warning(f"Failed to recover group {chat_id} with access_hash: {e}")
+                continue
         except Exception as e:
             logger.warning(f"Error verifying group {chat_id}: {e}")
             continue
+
+        if member.status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.OWNER,
+        ):
+            group_data = {
+                "_id": chat.id,
+                "title": chat.title,
+                "username": chat.username,
+                "type": chat.type.value,
+                "is_admin": member.status in (
+                    ChatMemberStatus.ADMINISTRATOR,
+                    ChatMemberStatus.OWNER,
+                ),
+                "access_hash": getattr(chat, "access_hash", None),
+            }
+            await group_log_db.update_one(
+                {"_id": chat.id},
+                {"$set": group_data},
+                upsert=True
+            )
+
+            count = 0
+            async for member in client.get_chat_members(chat.id):
+                try:
+                    user = member.user
+                    member_data = {
+                        "group_id": chat.id,
+                        "user_id": user.id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "username": user.username,
+                        "status": getattr(member.status, "value", member.status),
+                    }
+                    await group_members_db.update_one(
+                        {"group_id": chat.id, "user_id": user.id},
+                        {"$set": member_data},
+                        upsert=True
+                    )
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to store user in group {chat.id}: {e}")
+            logger.info(f"Verified {chat.title} [{chat.id}] with {count} members")
+            updated_groups.append(f"{chat.title} [`{chat.id}`]")
+        else:
+            logger.info(f"Bot not present in group {chat_id}, skipping.")
 
     return updated_groups
 

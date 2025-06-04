@@ -85,13 +85,14 @@ async def verify_all_groups_from_db(client):
 
     async for group in group_log_db.find({}):
         chat_id = group["_id"]
-        access_hash = group.get("access_hash")
+        raw_access_hash = group.get("access_hash")
+        access_hash = int(raw_access_hash) if raw_access_hash is not None else None
         try:
             if access_hash is not None:
                 try:
                     input_peer = InputPeerChannel(
                         channel_id=int(str(chat_id).replace("-100", "")),
-                        access_hash=int(access_hash)
+                        access_hash=access_hash
                     )
                     chat = await client.get_chat(input_peer)
                     chat_id = chat.id
@@ -118,7 +119,7 @@ async def verify_all_groups_from_db(client):
                 "username": chat.username,
                 "type": chat.type.value,
                 "is_admin": member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
-                "access_hash": int(access_hash) if access_hash else None,
+                "access_hash": access_hash,
             }
 
             logger.info(f"Verifying group from DB: {group_data}")

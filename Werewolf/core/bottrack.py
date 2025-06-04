@@ -18,14 +18,18 @@ group_members_db = db["group_members"]
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
     try:
         if not update.new_chat_member or not update.new_chat_member.user:
+            logger.debug("Skipped update with no new_chat_member or user info.")
             return
 
         bot_id = (await client.get_me()).id
         if update.new_chat_member.user.id != bot_id:
+            logger.debug(f"Ignored update not related to the bot (User ID: {update.new_chat_member.user.id})")
             return
 
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
+
+        logger.info(f"Detected status change in group '{chat.title}' [ID: {chat.id}] to '{new_status}'")
 
         if new_status in (
             ChatMemberStatus.MEMBER,
@@ -45,7 +49,9 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 {"$set": group_data},
                 upsert=True
             )
+            logger.info(f"✅ Group data stored/updated for: '{chat.title}' [ID: {chat.id}]")
 
+            logger.info(f"📥 Fetching visible members for group: '{chat.title}' [ID: {chat.id}] (admin: {group_data['is_admin']})")
             visible_count = 0
             async for member in client.get_chat_members(chat.id):
                 try:
@@ -64,8 +70,13 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                         upsert=True
                     )
                     visible_count += 1
-                except Exception:
-                    continue
+                except Exception as user_err:
+                    logger.warning(f"⚠️ Failed to store user {member.user.id} in group '{chat.title}': {user_err}")
+            logger.info(f"✅ Stored {visible_count} visible members for group: '{chat.title}' [ID: {chat.id}]")
+
+        else:
+            logger.info(f"ℹ️ Bot status '{new_status}' in group '{chat.title}' [ID: {chat.id}] — ignored.")
+
     except Exception as e:
         logger.exception(f"❌ Unexpected error in status change handler: {e}")
 
@@ -75,6 +86,7 @@ async def verify_groups_command(client, message: Message):
         me = await client.get_me()
         updated_groups = []
 
+        logger.info(f"🔍 Starting group verification triggered by {message.from_user.id}")
         async for dialog in client.get_dialogs():
             chat = dialog.chat
             if chat.type in ("group", "supergroup"):
@@ -101,7 +113,9 @@ async def verify_groups_command(client, message: Message):
                             upsert=True
                         )
                         updated_groups.append(f"{chat.title} [`{chat.id}`]")
-                except Exception:
+                        logger.info(f"✅ Verified group: '{chat.title}' [ID: {chat.id}]")
+                except Exception as e:
+                    logger.warning(f"⚠️ Skipped group ID {chat.id} due to error: {e}")
                     continue
 
         if updated_groups:
@@ -111,7 +125,9 @@ async def verify_groups_command(client, message: Message):
             reply_text = "ℹ️ No groups found or updated."
 
         await message.reply_text(reply_text)
+        logger.info("✅ Group verification completed successfully.")
     except Exception as e:
+        logger.exception("❌ Error during /verifygroups execution.")
         await message.reply_text(f"❌ Error verifying groups: {e}")
 
 if __name__ == "__main__":

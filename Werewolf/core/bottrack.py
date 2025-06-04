@@ -49,7 +49,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 {"$set": group_data},
                 upsert=True
             )
-            logger.info(f"✅ Group data stored/updated for: '{chat.title}' [ID: {chat.id}]")
+            logger.info(f"✅ Group data stored/updated for: '{chat.title}' [ID: {chat.id}']")
 
             logger.info(f"📥 Fetching visible members for group: '{chat.title}' [ID: {chat.id}] (admin: {group_data['is_admin']})")
             visible_count = 0
@@ -72,7 +72,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                     visible_count += 1
                 except Exception as user_err:
                     logger.warning(f"⚠️ Failed to store user {member.user.id} in group '{chat.title}': {user_err}")
-            logger.info(f"✅ Stored {visible_count} visible members for group: '{chat.title}' [ID: {chat.id}]")
+            logger.info(f"✅ Stored {visible_count} visible members for group: '{chat.title}' [ID: {chat.id}']")
 
         else:
             logger.info(f"ℹ️ Bot status '{new_status}' in group '{chat.title}' [ID: {chat.id}] — ignored.")
@@ -80,48 +80,54 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
     except Exception as e:
         logger.exception(f"❌ Unexpected error in status change handler: {e}")
 
+
+async def verify_all_groups_from_db(client):
+    me = await client.get_me()
+    updated_groups = []
+
+    async for group in group_log_db.find({}):
+        chat_id = group["_id"]
+        try:
+            chat = await client.get_chat(chat_id)
+            member = await client.get_chat_member(chat_id, me.id)
+
+            if member.status in (
+                ChatMemberStatus.MEMBER,
+                ChatMemberStatus.ADMINISTRATOR,
+                ChatMemberStatus.OWNER,
+            ):
+                group_data = {
+                    "_id": chat.id,
+                    "title": chat.title,
+                    "username": chat.username,
+                    "type": chat.type.value,
+                    "is_admin": member.status in (
+                        ChatMemberStatus.ADMINISTRATOR,
+                        ChatMemberStatus.OWNER,
+                    ),
+                }
+                await group_log_db.update_one(
+                    {"_id": chat.id},
+                    {"$set": group_data},
+                    upsert=True
+                )
+                updated_groups.append(f"{chat.title} [`{chat.id}`]")
+                logger.info(f"✅ Verified group: '{chat.title}' [ID: {chat.id}']")
+            else:
+                logger.info(f"❌ Bot is no longer a member/admin in group ID: {chat_id}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Skipped group ID {chat_id} due to error: {e}")
+            continue
+
+    return updated_groups
+
+
 @app.on_message(filters.command("verifygroups") & filters.user(OWNER_ID))
 async def verify_groups_command(client, message: Message):
     try:
-        me = await client.get_me()
-        updated_groups = []
-
         logger.info(f"🔍 Starting group verification triggered by {message.from_user.id}")
-
-        async for group in group_log_db.find({}):
-            chat_id = group["_id"]
-            try:
-                chat = await client.get_chat(chat_id)
-                member = await client.get_chat_member(chat_id, me.id)
-
-                if member.status in (
-                    ChatMemberStatus.MEMBER,
-                    ChatMemberStatus.ADMINISTRATOR,
-                    ChatMemberStatus.OWNER,
-                ):
-                    group_data = {
-                        "_id": chat.id,
-                        "title": chat.title,
-                        "username": chat.username,
-                        "type": chat.type.value,
-                        "is_admin": member.status in (
-                            ChatMemberStatus.ADMINISTRATOR,
-                            ChatMemberStatus.OWNER,
-                        ),
-                    }
-                    await group_log_db.update_one(
-                        {"_id": chat.id},
-                        {"$set": group_data},
-                        upsert=True
-                    )
-                    updated_groups.append(f"{chat.title} [`{chat.id}`]")
-                    logger.info(f"✅ Verified group: '{chat.title}' [ID: {chat.id}]")
-                else:
-                    logger.info(f"❌ Bot is no longer a member/admin in group ID: {chat_id}")
-
-            except Exception as e:
-                logger.warning(f"⚠️ Skipped group ID {chat_id} due to error: {e}")
-                continue
+        updated_groups = await verify_all_groups_from_db(client)
 
         if updated_groups:
             group_list_text = "\n".join(updated_groups)

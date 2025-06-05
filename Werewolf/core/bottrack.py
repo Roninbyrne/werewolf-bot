@@ -8,15 +8,10 @@ from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
 from Werewolf.core.mongo import group_log_db, group_members_db
 from config import OWNER_ID, LOGGER_ID
-from Werewolf.core.mongo import mongodb
+from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Werewolf.core.bottrack")
-
-
-async def is_logging_enabled():
-    config = await LOGGING_COLLECTION.find_one({"_id": "global"})
-    return config and config.get("enabled", False)
 
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):

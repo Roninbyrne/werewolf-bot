@@ -27,7 +27,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 
             if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or not update.new_chat_member:
                 await group_log_db.delete_one({"_id": chat.id})
-                await group_members_db.delete_many({"group_id": chat.id})
+                await group_members_db.update_many({"group_id": chat.id}, {"$set": {"status": "left"}})
                 if await is_logging_enabled():
                     await client.send_message(
                         LOGGER_ID,
@@ -65,20 +65,21 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 async for member in client.get_chat_members(chat.id):
                     try:
                         user = member.user
-                        member_data = {
-                            "group_id": chat.id,
-                            "user_id": user.id,
-                            "first_name": user.first_name,
-                            "last_name": user.last_name,
-                            "username": user.username,
-                            "status": getattr(member.status, "value", member.status),
-                        }
-                        await group_members_db.update_one(
-                            {"group_id": chat.id, "user_id": user.id},
-                            {"$set": member_data},
-                            upsert=True
-                        )
-                        count += 1
+                        if user:
+                            member_data = {
+                                "group_id": chat.id,
+                                "user_id": user.id,
+                                "first_name": user.first_name,
+                                "last_name": user.last_name,
+                                "username": user.username,
+                                "status": getattr(member.status, "value", member.status),
+                            }
+                            await group_members_db.update_one(
+                                {"group_id": chat.id, "user_id": user.id},
+                                {"$set": member_data},
+                                upsert=True
+                            )
+                            count += 1
                     except Exception as e:
                         logger.warning(f"Failed to store user in group {chat.id}: {e}")
 
@@ -97,6 +98,22 @@ async def send_group_stats(client, message: Message):
     count, summaries = await get_all_groups_summary()
     text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
     await message.reply_text(text or "No groups found.")
+
+@app.on_message(filters.group)
+async def update_user_info_on_message(client, message: Message):
+    user = message.from_user
+    chat = message.chat
+    if user:
+        await group_members_db.update_one(
+            {"group_id": chat.id, "user_id": user.id},
+            {"$set": {
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "username": user.username,
+                "status": "member",
+            }},
+            upsert=True
+        )
 
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
@@ -155,20 +172,21 @@ async def verify_all_groups_from_db(client):
             async for member in client.get_chat_members(chat.id):
                 try:
                     user = member.user
-                    member_data = {
-                        "group_id": chat.id,
-                        "user_id": user.id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "username": user.username,
-                        "status": getattr(member.status, "value", member.status),
-                    }
-                    await group_members_db.update_one(
-                        {"group_id": chat.id, "user_id": user.id},
-                        {"$set": member_data},
-                        upsert=True
-                    )
-                    count += 1
+                    if user:
+                        member_data = {
+                            "group_id": chat.id,
+                            "user_id": user.id,
+                            "first_name": user.first_name,
+                            "last_name": user.last_name,
+                            "username": user.username,
+                            "status": getattr(member.status, "value", member.status),
+                        }
+                        await group_members_db.update_one(
+                            {"group_id": chat.id, "user_id": user.id},
+                            {"$set": member_data},
+                            upsert=True
+                        )
+                        count += 1
                 except Exception as e:
                     logger.warning(f"Failed to store user in group {chat.id}: {e}")
 

@@ -8,6 +8,7 @@ from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI, OWNER_ID, LOGGER_ID
+from Werewolf.core.mongo import mongodb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Werewolf.core.bottrack")
@@ -16,6 +17,11 @@ mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
 db = mongo_client["store"]
 group_log_db = db["group_logs"]
 group_members_db = db["group_members"]
+LOGGING_COLLECTION = mongodb.logging_config
+
+async def is_logging_enabled():
+    config = await LOGGING_COLLECTION.find_one({"_id": "global"})
+    return config and config.get("enabled", False)
 
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
@@ -32,10 +38,11 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
             if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or not update.new_chat_member:
                 await group_log_db.delete_one({"_id": chat.id})
                 await group_members_db.delete_many({"group_id": chat.id})
-                await client.send_message(
-                    LOGGER_ID,
-                    f"❌ Bot removed from group: {chat.title} [`{chat.id}`]"
-                )
+                if await is_logging_enabled():
+                    await client.send_message(
+                        LOGGER_ID,
+                        f"❌ Bot removed from group: {chat.title} [`{chat.id}`]"
+                    )
                 logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
                 logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
                 return
@@ -85,14 +92,21 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                     except Exception as e:
                         logger.warning(f"Failed to store user in group {chat.id}: {e}")
 
-                await client.send_message(
-                    LOGGER_ID,
-                    f"✅ Bot added to group: {chat.title} [`{chat.id}`]\n👤 Members saved: {count}"
-                )
+                if await is_logging_enabled():
+                    await client.send_message(
+                        LOGGER_ID,
+                        f"✅ Bot added to group: {chat.title} [`{chat.id}`]\n👤 Members saved: {count}"
+                    )
                 logger.info(f"Bot added to group: {group_data}")
                 logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
+
+@app.on_message(filters.command("groupstats") & filters.user(OWNER_ID))
+async def send_group_stats(client, message: Message):
+    count, summaries = await get_all_groups_summary()
+    text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
+    await message.reply_text(text or "No groups found.")
 
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
@@ -192,12 +206,6 @@ async def get_all_groups_summary():
     except Exception as e:
         logger.exception("Failed to fetch groups summary from DB")
         return 0, []
-
-@app.on_message(filters.command("groupstats") & filters.user(OWNER_ID))
-async def send_group_stats(client, message: Message):
-    count, summaries = await get_all_groups_summary()
-    text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
-    await message.reply_text(text or "No groups found.")
 
 async def verify_groups_command(client, message: Message):
     updated_groups = await verify_all_groups_from_db(client)

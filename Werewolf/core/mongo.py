@@ -11,6 +11,7 @@ try:
     group_members_db = db["group_members"]
     global_ban_db = db["global_bans"]
     global_userinfo_db = db["user_info"]
+    mongodb = db
 
     LOGGER(__name__).info("Connected to your Mongo Database.")
 except Exception as e:

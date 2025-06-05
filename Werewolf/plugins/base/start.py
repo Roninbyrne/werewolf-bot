@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 import config
 from Werewolf import app
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
-from Werewolf.plugins.base.db import global_userinfo_db
+from Werewolf.core.mongo import global_userinfo_db
 from config import LOGGER_ID
 
 

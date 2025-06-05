@@ -30,6 +30,12 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
 
+        if new_status in ("left", "kicked"):
+            await group_log_db.delete_one({"_id": chat.id})
+            await group_members_db.delete_many({"group_id": chat.id})
+            logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
+            return
+
         if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             channel_id = int(str(chat.id).replace("-100", ""))
             access_hash = None
@@ -183,7 +189,6 @@ async def send_group_stats(client, message: Message):
     count, summaries = await get_all_groups_summary()
     text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
     await message.reply_text(text or "No groups found.")
-
 
 async def verify_groups_command(client, message: Message):
     updated_groups = await verify_all_groups_from_db(client)

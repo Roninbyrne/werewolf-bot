@@ -1,6 +1,7 @@
 from pyrogram import Client, filters
-from pyrogram.errors import UserNotParticipant
 from pyrogram.types import Message
+from pyrogram.raw.functions.users import GetUsers
+from pyrogram.raw.types import InputUser
 from Werewolf import app
 from Werewolf.core.mongo import global_ban_db, group_log_db
 from config import OWNER_ID, GBAN_LOGS
@@ -23,6 +24,17 @@ async def ungban_user(client: Client, message: Message):
     name = f"{user.first_name} {user.last_name or ''}".strip()
     username = f"@{user.username}" if user.username else "N/A"
 
+    try:
+        raw = await client.invoke(GetUsers([InputUser(user_id=user.id, access_hash=user.access_hash)]))
+        access_hash = raw[0].access_hash
+        await global_ban_db.update_one(
+            {"_id": user_id},
+            {"$set": {"access_hash": access_hash}},
+            upsert=True
+        )
+    except Exception as e:
+        print(f"[ungban] Could not retrieve access_hash: {e}")
+
     initiator = message.from_user
     initiator_name = initiator.first_name
     initiator_id = initiator.id
@@ -37,7 +49,7 @@ async def ungban_user(client: Client, message: Message):
             continue
         await asyncio.sleep(0.5)
 
-    global_ban_db.delete_one({"_id": user_id})
+    await global_ban_db.delete_one({"_id": user_id})
 
     text = (
         f"✅ <b>Global Unban Successful</b>\n\n"

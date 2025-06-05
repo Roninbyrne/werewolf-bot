@@ -1,7 +1,7 @@
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram import filters, Client
 from Werewolf import app
-from Werewolf.plugins.base.db import global_ban_db
+from Werewolf.core.mongo import global_ban_db
 from config import OWNER_ID
 
 PER_PAGE = 10

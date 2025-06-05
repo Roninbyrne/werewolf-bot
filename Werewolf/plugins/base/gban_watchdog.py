@@ -2,7 +2,7 @@ from pyrogram import Client
 from pyrogram.types import ChatMemberUpdated
 from pyrogram.enums import ChatMemberStatus
 from Werewolf import app
-from Werewolf.plugins.base.db import global_ban_db
+from Werewolf.core.mongo import global_ban_db
 
 @app.on_chat_member_updated()
 async def enforce_gban_on_join(client: Client, update: ChatMemberUpdated):

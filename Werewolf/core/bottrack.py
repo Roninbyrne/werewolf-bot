@@ -29,8 +29,11 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
+        old_status = update.old_chat_member.status if update.old_chat_member else None
 
-        if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
+        if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) and old_status in (
+            ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER
+        ):
             await group_log_db.delete_one({"_id": chat.id})
             await group_members_db.delete_many({"group_id": chat.id})
             await client.send_message(

@@ -6,7 +6,7 @@ from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
-from Werewolf.core.mongo import group_logs, group_members
+from Werewolf.core.mongo import group_log_db, group_members_db
 from config import OWNER_ID, LOGGER_ID
 from Werewolf.core.mongo import mongodb
 

@@ -7,7 +7,7 @@ from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
 from motor.motor_asyncio import AsyncIOMotorClient
-from config import MONGO_DB_URI, OWNER_ID
+from config import MONGO_DB_URI, OWNER_ID, LOGGER_ID
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Werewolf.core.bottrack")
@@ -29,60 +29,102 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 
         chat: Chat = update.chat
         new_status = update.new_chat_member.status
+        old_status = update.old_chat_member.status if update.old_chat_member else None
 
         if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
             await group_log_db.delete_one({"_id": chat.id})
             await group_members_db.delete_many({"group_id": chat.id})
             logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
             logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
+            try:
+                left_text = (
+                    f"🚪 Bot was removed from group:\n"
+                    f"📛 {chat.title}\n"
+                    f"🆔 `{chat.id}`"
+                )
+                await client.send_message(LOGGER_ID, left_text)
+            except Exception as e:
+                logger.warning(f"Failed to send removal log to LOGGER_ID: {e}")
             return
 
-        if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
-            channel_id = int(str(chat.id).replace("-100", ""))
-            access_hash = None
+        if old_status in (None, ChatMemberStatus.LEFT) and new_status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.OWNER,
+        ):
             try:
-                input_channel = InputChannel(channel_id=channel_id, access_hash=0)
-                result = await client.invoke(GetChannels(id=[input_channel]))
-                if result.chats:
-                    raw_chat = result.chats[0]
-                    access_hash = getattr(raw_chat, "access_hash", None)
-            except Exception as e:
-                logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
+                bot_user = update.new_chat_member.user
+                full_name = f"{bot_user.first_name or ''} {bot_user.last_name or ''}".strip()
+                user_id = bot_user.id
+                status = new_status.value
 
-            old_data = await group_log_db.find_one({"_id": chat.id})
-            group_data = {
-                "_id": chat.id,
-                "title": chat.title,
-                "username": chat.username,
-                "type": chat.type.value,
-                "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
-                "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
-            }
-
-            logger.info(f"Bot added/promoted in group: {group_data}")
-            await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
-
-            count = 0
-            async for member in client.get_chat_members(chat.id):
-                try:
-                    user = member.user
-                    member_data = {
-                        "group_id": chat.id,
-                        "user_id": user.id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "username": user.username,
-                        "status": getattr(member.status, "value", member.status),
-                    }
-                    await group_members_db.update_one(
-                        {"group_id": chat.id, "user_id": user.id},
-                        {"$set": member_data},
-                        upsert=True
+                if new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
+                    link = f"https://t.me/{bot_user.username}" if bot_user.username else f"[tg://user?id={user_id}](tg://user?id={user_id})"
+                    join_text = (
+                        f"✅ Bot joined as admin:\n"
+                        f"👤 {full_name} (`{user_id}`)\n"
+                        f"🔗 {link}\n"
+                        f"💬 Status: `{status}`\n"
+                        f"🏷️ Group: {chat.title} (`{chat.id}`)"
                     )
-                    count += 1
-                except Exception as e:
-                    logger.warning(f"Failed to store user in group {chat.id}: {e}")
-            logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")
+                else:
+                    join_text = (
+                        f"👤 Bot joined as member:\n"
+                        f"Name: {full_name}\n"
+                        f"ID: `{user_id}`\n"
+                        f"💬 Status: `{status}`\n"
+                        f"🏷️ Group: {chat.title} (`{chat.id}`)"
+                    )
+
+                await client.send_message(LOGGER_ID, join_text)
+            except Exception as e:
+                logger.warning(f"Failed to send join log to LOGGER_ID: {e}")
+
+        channel_id = int(str(chat.id).replace("-100", ""))
+        access_hash = None
+        try:
+            input_channel = InputChannel(channel_id=channel_id, access_hash=0)
+            result = await client.invoke(GetChannels(id=[input_channel]))
+            if result.chats:
+                raw_chat = result.chats[0]
+                access_hash = getattr(raw_chat, "access_hash", None)
+        except Exception as e:
+            logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
+
+        old_data = await group_log_db.find_one({"_id": chat.id})
+        group_data = {
+            "_id": chat.id,
+            "title": chat.title,
+            "username": chat.username,
+            "type": chat.type.value,
+            "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
+            "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
+        }
+
+        logger.info(f"Bot added/promoted in group: {group_data}")
+        await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
+
+        count = 0
+        async for member in client.get_chat_members(chat.id):
+            try:
+                user = member.user
+                member_data = {
+                    "group_id": chat.id,
+                    "user_id": user.id,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "username": user.username,
+                    "status": getattr(member.status, "value", member.status),
+                }
+                await group_members_db.update_one(
+                    {"group_id": chat.id, "user_id": user.id},
+                    {"$set": member_data},
+                    upsert=True
+                )
+                count += 1
+            except Exception as e:
+                logger.warning(f"Failed to store user in group {chat.id}: {e}")
+        logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
 

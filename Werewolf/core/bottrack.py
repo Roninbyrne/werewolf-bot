@@ -6,18 +6,18 @@ from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
-from Werewolf.core.mongo import group_log_db, group_members_db
+from Werewolf.core.mongo import group_log_db
 from config import OWNER_ID, LOGGER_ID
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Werewolf.core.bottrack")
 
-
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
     try:
         bot_id = (await client.get_me()).id
+
         old_user = update.old_chat_member.user if update.old_chat_member else None
         new_user = update.new_chat_member.user if update.new_chat_member else None
 
@@ -27,13 +27,13 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 
             if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or not update.new_chat_member:
                 await group_log_db.delete_one({"_id": chat.id})
-                await group_members_db.update_many({"group_id": chat.id}, {"$set": {"status": "left"}})
                 if await is_logging_enabled():
                     await client.send_message(
                         LOGGER_ID,
                         f"❌ Bot removed from Group\n\nName: {chat.title}\nID: `{chat.id}`"
                     )
                 logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
+                logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
                 return
 
             if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
@@ -60,63 +60,20 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
 
                 await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
 
-                count = 0
-                await group_members_db.update_many({"group_id": chat.id}, {"$set": {"status": "unknown"}})
-                async for member in client.get_chat_members(chat.id):
-                    try:
-                        user = member.user
-                        if user:
-                            member_data = {
-                                "group_id": chat.id,
-                                "user_id": user.id,
-                                "first_name": user.first_name,
-                                "last_name": user.last_name,
-                                "username": user.username,
-                                "status": getattr(member.status, "value", member.status),
-                            }
-                            await group_members_db.update_one(
-                                {"group_id": chat.id, "user_id": user.id},
-                                {"$set": member_data},
-                                upsert=True
-                            )
-                            count += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to store user in group {chat.id}: {e}")
-
                 if await is_logging_enabled():
                     await client.send_message(
                         LOGGER_ID,
-                        f"✅ Bot added in Group Successfully\n\nName: {chat.title}\nID: `{chat.id}`\nMembers Saved: {count}"
+                        f"✅ Bot added in Group Successfully\n\nName: {chat.title}\nID: `{chat.id}`"
                     )
                 logger.info(f"Bot added to group: {group_data}")
-                logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
-
 
 @app.on_message(filters.command("groupstats") & filters.user(OWNER_ID))
 async def send_group_stats(client, message: Message):
     count, summaries = await get_all_groups_summary()
     text = f"**Total Groups:** {count}\n\n" + "\n".join(summaries)
     await message.reply_text(text or "No groups found.")
-
-
-@app.on_message(filters.group)
-async def update_user_info_on_message(client, message: Message):
-    user = message.from_user
-    chat = message.chat
-    if user:
-        await group_members_db.update_one(
-            {"group_id": chat.id, "user_id": user.id},
-            {"$set": {
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "username": user.username,
-                "status": "member",
-            }},
-            upsert=True
-        )
-
 
 async def verify_all_groups_from_db(client):
     me = await client.get_me()
@@ -150,13 +107,14 @@ async def verify_all_groups_from_db(client):
                 chat = await client.get_chat(chat_id)
                 member = await client.get_chat_member(chat_id, me.id)
             except PeerIdInvalid:
-                logger.warning(f"❌ Cannot access group {chat_id} — access_hash and fallback both failed.")
+                if used_fallback or access_hash:
+                    logger.warning(f"❌ Failed to recover group {chat_id} — both access_hash and fallback failed.")
                 continue
             except Exception:
                 continue
 
         if used_fallback:
-            logger.info(f"🔁 Recovered group {chat_id} via fallback.")
+            logger.info(f"🔁 Recovered group {chat_id} via fallback (access_hash invalid or expired).")
 
         if member and member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
             group_data = {
@@ -169,35 +127,10 @@ async def verify_all_groups_from_db(client):
             }
 
             await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
-
-            count = 0
-            await group_members_db.update_many({"group_id": chat.id}, {"$set": {"status": "unknown"}})
-            async for member in client.get_chat_members(chat.id):
-                try:
-                    user = member.user
-                    if user:
-                        member_data = {
-                            "group_id": chat.id,
-                            "user_id": user.id,
-                            "first_name": user.first_name,
-                            "last_name": user.last_name,
-                            "username": user.username,
-                            "status": getattr(member.status, "value", member.status),
-                        }
-                        await group_members_db.update_one(
-                            {"group_id": chat.id, "user_id": user.id},
-                            {"$set": member_data},
-                            upsert=True
-                        )
-                        count += 1
-                except Exception as e:
-                    logger.warning(f"Failed to store user in group {chat.id}: {e}")
-
-            logger.info(f"✅ Verified {chat.title} [{chat.id}] with {count} members")
+            logger.info(f"✅ Verified {chat.title} [{chat.id}]")
             updated_groups.append(f"{chat.title} [`{chat.id}`]")
 
     return updated_groups
-
 
 async def get_all_groups_summary():
     try:
@@ -208,8 +141,7 @@ async def get_all_groups_summary():
         async for group in groups:
             name = group.get("title", "Unknown Title")
             chat_id = group.get("_id")
-            member_count = await group_members_db.count_documents({"group_id": chat_id})
-            summary = f"{name} [`{chat_id}`] - 👤 {member_count} members"
+            summary = f"{name} [`{chat_id}`]"
             group_summaries.append(summary)
             logger.info(f"[DUB] {summary}")
 
@@ -218,7 +150,6 @@ async def get_all_groups_summary():
     except Exception as e:
         logger.exception("Failed to fetch groups summary from DB")
         return 0, []
-
 
 async def verify_groups_command(client, message: Message):
     updated_groups = await verify_all_groups_from_db(client)

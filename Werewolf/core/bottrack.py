@@ -40,7 +40,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
                 return
 
-            if new_status == ChatMemberStatus.MEMBER:
+            if new_status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
                 channel_id = int(str(chat.id).replace("-100", ""))
                 access_hash = None
                 try:
@@ -58,7 +58,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                     "title": chat.title,
                     "username": chat.username,
                     "type": chat.type.value,
-                    "is_admin": False,
+                    "is_admin": new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER),
                     "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
                 }
 

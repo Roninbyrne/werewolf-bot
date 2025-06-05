@@ -23,8 +23,8 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
         if not update.new_chat_member or not update.new_chat_member.user:
             return
 
-        bot_id = (await client.get_me()).id
-        if update.new_chat_member.user.id != bot_id:
+        bot = await client.get_me()
+        if update.new_chat_member.user.id != bot.id:
             return
 
         chat: Chat = update.chat
@@ -37,12 +37,10 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
             logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
             logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
             try:
-                left_text = (
-                    f"🚪 Bot was removed from group:\n"
-                    f"📛 {chat.title}\n"
-                    f"🆔 `{chat.id}`"
+                await client.send_message(
+                    LOGGER_ID,
+                    f"🚪 Bot was removed from group:\n📛 {chat.title}\n🆔 `{chat.id}`"
                 )
-                await client.send_message(LOGGER_ID, left_text)
             except Exception as e:
                 logger.warning(f"Failed to send removal log to LOGGER_ID: {e}")
             return
@@ -53,14 +51,14 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
             ChatMemberStatus.OWNER,
         ):
             try:
-                bot_user = update.new_chat_member.user
-                full_name = f"{bot_user.first_name or ''} {bot_user.last_name or ''}".strip()
-                user_id = bot_user.id
+                user = update.new_chat_member.user
+                full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+                user_id = user.id
                 status = new_status.value
 
                 if new_status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
-                    link = f"https://t.me/{bot_user.username}" if bot_user.username else f"[tg://user?id={user_id}](tg://user?id={user_id})"
-                    join_text = (
+                    link = f"https://t.me/{user.username}" if user.username else f"[tg://user?id={user_id}](tg://user?id={user_id})"
+                    text = (
                         f"✅ Bot joined as admin:\n"
                         f"👤 {full_name} (`{user_id}`)\n"
                         f"🔗 {link}\n"
@@ -68,15 +66,14 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                         f"🏷️ Group: {chat.title} (`{chat.id}`)"
                     )
                 else:
-                    join_text = (
+                    text = (
                         f"👤 Bot joined as member:\n"
                         f"Name: {full_name}\n"
                         f"ID: `{user_id}`\n"
                         f"💬 Status: `{status}`\n"
                         f"🏷️ Group: {chat.title} (`{chat.id}`)"
                     )
-
-                await client.send_message(LOGGER_ID, join_text)
+                await client.send_message(LOGGER_ID, text)
             except Exception as e:
                 logger.warning(f"Failed to send join log to LOGGER_ID: {e}")
 

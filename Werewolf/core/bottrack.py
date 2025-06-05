@@ -6,18 +6,13 @@ from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
-from motor.motor_asyncio import AsyncIOMotorClient
-from config import MONGO_DB_URI, OWNER_ID, LOGGER_ID
+from Werewolf.core.mongo import group_logs, group_members
+from config import OWNER_ID, LOGGER_ID
 from Werewolf.core.mongo import mongodb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Werewolf.core.bottrack")
 
-mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
-db = mongo_client["store"]
-group_log_db = db["group_logs"]
-group_members_db = db["group_members"]
-LOGGING_COLLECTION = mongodb.logging_config
 
 async def is_logging_enabled():
     config = await LOGGING_COLLECTION.find_one({"_id": "global"})

@@ -2,8 +2,7 @@ from pyrogram import Client, filters
 from pyrogram.errors import UserNotParticipant
 from pyrogram.types import Message
 from Werewolf import app
-from Werewolf.plugins.base.db import global_ban_db
-from Werewolf.core.bottrack import group_log_db
+from Werewolf.core.mongo import global_ban_db, group_log_db
 from config import OWNER_ID, GBAN_LOGS
 import asyncio
 

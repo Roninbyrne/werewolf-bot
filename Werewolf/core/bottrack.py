@@ -20,81 +20,77 @@ group_members_db = db["group_members"]
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
     try:
-        if not update.new_chat_member or not update.new_chat_member.user:
-            return
-
         bot_id = (await client.get_me()).id
-        if update.new_chat_member.user.id != bot_id:
-            return
 
-        chat: Chat = update.chat
-        new_status = update.new_chat_member.status
-        old_status = update.old_chat_member.status if update.old_chat_member else None
+        old_user = update.old_chat_member.user if update.old_chat_member else None
+        new_user = update.new_chat_member.user if update.new_chat_member else None
 
-        if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) and old_status in (
-            ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER
-        ):
-            await group_log_db.delete_one({"_id": chat.id})
-            await group_members_db.delete_many({"group_id": chat.id})
-            await client.send_message(
-                LOGGER_ID,
-                f"❌ Bot removed from group: {chat.title} [`{chat.id}`]"
-            )
-            logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
-            logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
-            return
+        if (old_user and old_user.id == bot_id) or (new_user and new_user.id == bot_id):
+            chat: Chat = update.chat
+            new_status = update.new_chat_member.status if update.new_chat_member else None
 
-        if new_status == ChatMemberStatus.MEMBER:
-            channel_id = int(str(chat.id).replace("-100", ""))
-            access_hash = None
-            try:
-                input_channel = InputChannel(channel_id=channel_id, access_hash=0)
-                result = await client.invoke(GetChannels(id=[input_channel]))
-                if result.chats:
-                    raw_chat = result.chats[0]
-                    access_hash = getattr(raw_chat, "access_hash", None)
-            except Exception as e:
-                logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
+            if new_status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or not update.new_chat_member:
+                await group_log_db.delete_one({"_id": chat.id})
+                await group_members_db.delete_many({"group_id": chat.id})
+                await client.send_message(
+                    LOGGER_ID,
+                    f"❌ Bot removed from group: {chat.title} [`{chat.id}`]"
+                )
+                logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
+                logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
+                return
 
-            old_data = await group_log_db.find_one({"_id": chat.id})
-            group_data = {
-                "_id": chat.id,
-                "title": chat.title,
-                "username": chat.username,
-                "type": chat.type.value,
-                "is_admin": False,
-                "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
-            }
-
-            await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
-
-            count = 0
-            async for member in client.get_chat_members(chat.id):
+            if new_status == ChatMemberStatus.MEMBER:
+                channel_id = int(str(chat.id).replace("-100", ""))
+                access_hash = None
                 try:
-                    user = member.user
-                    member_data = {
-                        "group_id": chat.id,
-                        "user_id": user.id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "username": user.username,
-                        "status": getattr(member.status, "value", member.status),
-                    }
-                    await group_members_db.update_one(
-                        {"group_id": chat.id, "user_id": user.id},
-                        {"$set": member_data},
-                        upsert=True
-                    )
-                    count += 1
+                    input_channel = InputChannel(channel_id=channel_id, access_hash=0)
+                    result = await client.invoke(GetChannels(id=[input_channel]))
+                    if result.chats:
+                        raw_chat = result.chats[0]
+                        access_hash = getattr(raw_chat, "access_hash", None)
                 except Exception as e:
-                    logger.warning(f"Failed to store user in group {chat.id}: {e}")
+                    logger.warning(f"Failed to fetch access_hash for {chat.id}: {e}")
 
-            await client.send_message(
-                LOGGER_ID,
-                f"✅ Bot added to group: {chat.title} [`{chat.id}`]\n👤 Members saved: {count}"
-            )
-            logger.info(f"Bot added to group: {group_data}")
-            logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")
+                old_data = await group_log_db.find_one({"_id": chat.id})
+                group_data = {
+                    "_id": chat.id,
+                    "title": chat.title,
+                    "username": chat.username,
+                    "type": chat.type.value,
+                    "is_admin": False,
+                    "access_hash": int(access_hash) if access_hash else int(old_data.get("access_hash")) if old_data and old_data.get("access_hash") else None,
+                }
+
+                await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
+
+                count = 0
+                async for member in client.get_chat_members(chat.id):
+                    try:
+                        user = member.user
+                        member_data = {
+                            "group_id": chat.id,
+                            "user_id": user.id,
+                            "first_name": user.first_name,
+                            "last_name": user.last_name,
+                            "username": user.username,
+                            "status": getattr(member.status, "value", member.status),
+                        }
+                        await group_members_db.update_one(
+                            {"group_id": chat.id, "user_id": user.id},
+                            {"$set": member_data},
+                            upsert=True
+                        )
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to store user in group {chat.id}: {e}")
+
+                await client.send_message(
+                    LOGGER_ID,
+                    f"✅ Bot added to group: {chat.title} [`{chat.id}`]\n👤 Members saved: {count}"
+                )
+                logger.info(f"Bot added to group: {group_data}")
+                logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
 

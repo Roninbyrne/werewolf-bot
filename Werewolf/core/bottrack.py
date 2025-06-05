@@ -41,7 +41,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 if await is_logging_enabled():
                     await client.send_message(
                         LOGGER_ID,
-                        f"❌ Bot removed from group: {chat.title} [`{chat.id}`]"
+                        f"❌ Bot removed from Group\n\nName: {chat.title}\nID: `{chat.id}`"
                     )
                 logger.info(f"❌ Bot was removed from group {chat.id} — deleted from DB.")
                 logger.info(f"[DUB] Removed group {chat.title} [{chat.id}] from DB.")
@@ -95,7 +95,7 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                 if await is_logging_enabled():
                     await client.send_message(
                         LOGGER_ID,
-                        f"✅ Bot added to group: {chat.title} [`{chat.id}`]\n👤 Members saved: {count}"
+                        f"✅ Bot added in Group Successfully\n\nName: {chat.title}\nID: `{chat.id}`\nMembers Saved: {count}"
                     )
                 logger.info(f"Bot added to group: {group_data}")
                 logger.info(f"Stored {count} members for group: {chat.title} [{chat.id}]")

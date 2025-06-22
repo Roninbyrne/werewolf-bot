@@ -11,7 +11,7 @@ from config import OWNER_ID, LOGGER_ID
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Amelie.core.bottrack")
+logger = logging.getLogger("Werewolf.core.bottrack")
 
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):

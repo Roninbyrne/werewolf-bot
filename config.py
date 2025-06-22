@@ -48,10 +48,6 @@ OWNER_ID = 7394132959
 HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
 HEROKU_API_KEY = getenv("HEROKU_API_KEY")
 
-# GitHub repo for pulling bot updates
-UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/Roninbyrne/Elapsed")
-UPSTREAM_BRANCH = getenv("UPSTREAM_BRANCH", "main")
-GIT_TOKEN = getenv("git_token", None)  # Optional GitHub token for private repo access
 
 # Support links
 SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/PacificArc")

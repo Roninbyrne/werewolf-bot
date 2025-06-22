@@ -6,14 +6,12 @@ from pyrogram.enums import ChatMemberStatus, ChatAction
 from pyrogram.errors import PeerIdInvalid
 from pyrogram.raw.functions.channels import GetChannels
 from pyrogram.raw.types import InputChannel
-from pyrogram.raw.functions.users import GetUsers
-from pyrogram.raw.types import InputUser
-from Werewolf.core.mongo import group_log_db, group_members_db
+from Werewolf.core.mongo import group_log_db
 from config import OWNER_ID, LOGGER_ID
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Werewolf.core.bottrack")
+logger = logging.getLogger("Amelie.core.bottrack")
 
 @app.on_chat_member_updated()
 async def handle_bot_status_change(client, update: ChatMemberUpdated):
@@ -68,7 +66,6 @@ async def handle_bot_status_change(client, update: ChatMemberUpdated):
                         f"✅ Bot added in Group Successfully\n\nName: {chat.title}\nID: `{chat.id}`"
                     )
                 logger.info(f"Bot added to group: {group_data}")
-                await fetch_and_store_group_members(client, chat.id)
     except Exception as e:
         logger.exception(f"Error in bot status change handler: {e}")
 
@@ -132,7 +129,6 @@ async def verify_all_groups_from_db(client):
             await group_log_db.update_one({"_id": chat.id}, {"$set": group_data}, upsert=True)
             logger.info(f"✅ Verified {chat.title} [{chat.id}]")
             updated_groups.append(f"{chat.title} [`{chat.id}`]")
-            await fetch_and_store_group_members(client, chat.id)
 
     return updated_groups
 
@@ -160,32 +156,3 @@ async def verify_groups_command(client, message: Message):
     text = "✅ Verified Groups:\n\n" + "\n".join(updated_groups) if updated_groups else "No groups verified."
     if message:
         await message.reply_text(text)
-
-async def fetch_and_store_group_members(client, chat_id):
-    try:
-        async for member in client.get_chat_members(chat_id):
-            user = member.user
-            if user.is_bot:
-                continue
-            user_id = user.id
-            access_hash = None
-            try:
-                input_user = InputUser(user_id=user_id, access_hash=0)
-                result = await client.invoke(GetUsers(id=[input_user]))
-                if result.users:
-                    raw_user = result.users[0]
-                    access_hash = getattr(raw_user, "access_hash", None)
-            except Exception:
-                pass
-            user_data = {
-                "_id": user_id,
-                "first_name": user.first_name,
-                "username": user.username,
-                "access_hash": int(access_hash) if access_hash else None,
-                "group_id": chat_id,
-            }
-            result = await group_members_db.update_one({"_id": user_id}, {"$setOnInsert": user_data}, upsert=True)
-            if result.upserted_id:
-                logger.info(f"[DUB] Stored user {user_id} from group {chat_id}")
-    except Exception as e:
-        logger.exception(f"Failed to fetch members from group {chat_id}: {e}")

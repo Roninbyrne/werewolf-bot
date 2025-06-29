@@ -1,8 +1,7 @@
+
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bson import ObjectId
-import random
-import asyncio
 
 def register_callbacks(app, games_col, players_col, actions_col):
 
@@ -13,7 +12,7 @@ def register_callbacks(app, games_col, players_col, actions_col):
 
         if data.startswith("join_"):
             game_id = ObjectId(data.split("_")[1])
-            game = games_col.find_one({"_id": game_id})
+            game = await games_col.find_one({"_id": game_id})
             if not game or not game.get("active") or game.get("phase") != "lobby":
                 await callback.answer("❌ Not accepting joins.", show_alert=True)
                 return
@@ -25,12 +24,12 @@ def register_callbacks(app, games_col, players_col, actions_col):
                 await callback.answer("❌ Game full.")
                 return
             players.append(user_id)
-            games_col.update_one({"_id": game_id}, {"$set": {"players": players}})
+            await games_col.update_one({"_id": game_id}, {"$set": {"players": players}})
             await callback.answer(f"✅ Joined! Total: {len(players)}")
 
         elif data.startswith("reveal_") or data.startswith("bulkrole_"):
             game_id = ObjectId(data.split("_")[1])
-            player = players_col.find_one({"_id": user_id, "game_id": game_id})
+            player = await players_col.find_one({"_id": user_id, "game_id": game_id})
             if not player:
                 await callback.answer("❌ You are not part of this game.", show_alert=True)
                 return
@@ -44,9 +43,9 @@ def register_callbacks(app, games_col, players_col, actions_col):
 
         elif data.startswith("action_"):
             action = data.split("_")[1]
-            player = players_col.find_one({"_id": user_id})
+            player = await players_col.find_one({"_id": user_id})
             game_id = player.get("game_id")
-            others = list(players_col.find({"game_id": game_id, "_id": {"$ne": user_id}}))
+            others = await players_col.find({"game_id": game_id, "_id": {"$ne": user_id}}).to_list(length=100)
             buttons = [
                 [InlineKeyboardButton(p.get("name", str(p["_id"])), callback_data=f"target_{action}_{p['_id']}")]
                 for p in others
@@ -57,13 +56,13 @@ def register_callbacks(app, games_col, players_col, actions_col):
             parts = data.split("_")
             action = parts[1]
             target_id = parts[2]
-            player = players_col.find_one({"_id": user_id})
+            player = await players_col.find_one({"_id": user_id})
             chat_id = player.get("game_chat")
-            existing = actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": action})
+            existing = await actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": action})
             if existing:
-                actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
+                await actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
             else:
-                actions_col.insert_one({
+                await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": action, "target_id": target_id
                 })
             await callback.answer("✅ Action submitted.", show_alert=True)
@@ -71,13 +70,13 @@ def register_callbacks(app, games_col, players_col, actions_col):
 
         elif data.startswith("vote_"):
             target_id = data.split("_")[1]
-            player = players_col.find_one({"_id": user_id})
+            player = await players_col.find_one({"_id": user_id})
             chat_id = player.get("game_chat")
-            existing = actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": "vote"})
+            existing = await actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": "vote"})
             if existing:
-                actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
+                await actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
             else:
-                actions_col.insert_one({
+                await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": "vote", "target_id": target_id
                 })
             await callback.answer("✅ Vote submitted.", show_alert=True)
@@ -85,13 +84,13 @@ def register_callbacks(app, games_col, players_col, actions_col):
 
         elif data.startswith("target_wvote_"):
             target_id = int(data.split("_")[2])
-            player = players_col.find_one({"_id": user_id})
+            player = await players_col.find_one({"_id": user_id})
             chat_id = player.get("game_chat")
-            existing = actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": "wvote"})
+            existing = await actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": "wvote"})
             if existing:
-                actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
+                await actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
             else:
-                actions_col.insert_one({
+                await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": "wvote", "target_id": target_id
                 })
             await callback.answer("✅ Vote cast.", show_alert=True)
@@ -99,11 +98,11 @@ def register_callbacks(app, games_col, players_col, actions_col):
 
         elif data.startswith("alpha_bite_"):
             target_id = int(data.split("_")[2])
-            player = players_col.find_one({"_id": user_id})
+            player = await players_col.find_one({"_id": user_id})
             chat_id = player.get("game_chat")
-            existing = actions_col.count_documents({"chat_id": chat_id, "user_id": user_id, "action": "bite"})
-            if existing < 2:
-                actions_col.insert_one({
+            count = await actions_col.count_documents({"chat_id": chat_id, "user_id": user_id, "action": "bite"})
+            if count < 2:
+                await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": "bite", "target_id": target_id
                 })
                 await callback.answer("✅ Bite target selected.", show_alert=True)

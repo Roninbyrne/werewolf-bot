@@ -13,6 +13,11 @@ try:
     global_userinfo_db = db["user_info"]
     mongodb = db
 
+    werewolf_db = mongo_client["werewolf_bot"]
+    games_col = werewolf_db["games"]
+    players_col = werewolf_db["players"]
+    actions_col = werewolf_db["actions"]
+
     LOGGER(__name__).info("Connected to your Mongo Database.")
 except Exception as e:
     LOGGER(__name__).error(f"Failed to connect to your Mongo Database: {e}")

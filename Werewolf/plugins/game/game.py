@@ -8,15 +8,16 @@ from bson import ObjectId
 from config import MONGO_DB_URI
 from werewolf.plugins.game.callbacks import register_callbacks
 from Werewolf.core.mongo import games_col, players_col, actions_col
-
-JOIN_TIME = 60
-MIN_PLAYERS = 5
-MAX_PLAYERS = 20
-ROLE_WEREWOLF = "werewolf"
-ROLE_VILLAGER = "villager"
-ROLE_ALPHA = "alpha"
-ROLE_DOCTOR = "doctor"
-ROLE_SPY = "spy"
+from config import (
+    JOIN_TIME,
+    MIN_PLAYERS,
+    MAX_PLAYERS,
+    ROLE_WEREWOLF,
+    ROLE_VILLAGER,
+    ROLE_ALPHA,
+    ROLE_DOCTOR,
+    ROLE_SPY,
+)
 
 register_callbacks(app, games_col, players_col, actions_col)
 

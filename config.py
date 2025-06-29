@@ -31,7 +31,17 @@ HELP_VIDEO_3 = "https://unitedcamps.in/Images/file_11453.jpg"
 HELP_VIDEO_4 = "https://unitedcamps.in/Images/file_11454.jpg"
 
 #------------------------------------
+JOIN_TIME = 60
+MIN_PLAYERS = 5
+MAX_PLAYERS = 20
 
+ROLE_WEREWOLF = "werewolf"
+ROLE_VILLAGER = "villager"
+ROLE_ALPHA = "alpha"
+ROLE_DOCTOR = "doctor"
+ROLE_SPY = "spy"
+
+#------------------------------------
 # Log channel ID where bot sends important events/logs (e.g., bans, errors)
 LOGGER_ID = -1002059639505
 

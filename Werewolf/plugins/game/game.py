@@ -24,7 +24,6 @@ from config import (
 
 register_callbacks(app, games_col, players_col, actions_col)
 
-
 @app.on_message(filters.command("startgame") & filters.group)
 async def start_game(client, message):
     chat_id = message.chat.id
@@ -82,7 +81,8 @@ async def start_game(client, message):
     player_lines = []
     for i, pid in enumerate(players):
         user = await client.get_users(pid)
-        player_lines.append(f"{i+1}. [{user.first_name}](tg://user?id={pid})")
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        player_lines.append(f"{i+1}. [{full_name}](tg://user?id={pid})")
 
     bot_username = (await client.get_me()).username
 
@@ -105,12 +105,22 @@ async def start_game(client, message):
 
     await asyncio.sleep(30)
 
-    revealed_count = await players_col.count_documents({"game_id": game_id, "role": {"$exists": True}})
+    revealed_players = await players_col.find({"game_id": game_id, "role": {"$exists": True}}).to_list(length=100)
+    revealed_count = len(revealed_players)
+
     if revealed_count < MIN_PLAYERS:
-        await games_col.update_one({"_id": game_id}, {"$set": {"active": False, "phase": "cancelled"}})
+        total_joined = len(players)
         await client.send_message(
             chat_id,
-            f"❌ Not enough players revealed their roles ({revealed_count}/{MIN_PLAYERS}). Game cancelled."
+            f"⚠️ Only {revealed_count}/{total_joined} players revealed their roles.\n"
+            f"⌛ Waiting 10 more seconds before cancellation..."
+        )
+        await asyncio.sleep(10)
+        await games_col.update_one({"_id": game_id}, {"$set": {"active": False, "phase": "cancelled"}})
+        await reset_game(chat_id)
+        await client.send_message(
+            chat_id,
+            f"❌ Game cancelled due to insufficient participation after reveal phase."
         )
         return
 

@@ -26,20 +26,6 @@ def register_callbacks(app, games_col, players_col, actions_col):
             await games_col.update_one({"_id": game_id}, {"$set": {"players": players}})
             await callback.answer(f"✅ Joined! Total: {len(players)}")
 
-        elif data.startswith("reveal_") or data.startswith("bulkrole_"):
-            game_id = ObjectId(data.split("_")[1])
-            player = await players_col.find_one({"_id": user_id, "game_id": game_id})
-            if not player:
-                await callback.answer("❌ You are not part of this game.", show_alert=True)
-                return
-            role = player.get("role", "Unknown").capitalize()
-            disguised = player.get("disguised", False)
-            text = f"🎭 Role: *{role}*\n"
-            if disguised:
-                text += "🕵️‍♂️ You are currently disguised."
-            await callback.answer()
-            await callback.message.edit_text(text, parse_mode=ParseMode.MARKDOWN)
-
         elif data.startswith("action_"):
             action = data.split("_")[1]
             player = await players_col.find_one({"_id": user_id})

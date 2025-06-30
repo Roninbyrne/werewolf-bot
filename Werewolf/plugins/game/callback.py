@@ -1,4 +1,3 @@
-
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bson import ObjectId
@@ -100,12 +99,41 @@ def register_callbacks(app, games_col, players_col, actions_col):
             target_id = int(data.split("_")[2])
             player = await players_col.find_one({"_id": user_id})
             chat_id = player.get("game_chat")
-            count = await actions_col.count_documents({"chat_id": chat_id, "user_id": user_id, "action": "bite"})
-            if count < 2:
-                await actions_col.insert_one({
-                    "chat_id": chat_id, "user_id": user_id, "action": "bite", "target_id": target_id
+
+            current_bites = await actions_col.find(
+                {"chat_id": chat_id, "user_id": user_id, "action": "bite"}
+            ).to_list(length=10)
+
+            target_ids = [str(t["target_id"]) for t in current_bites]
+
+            if str(target_id) in target_ids:
+                await actions_col.delete_one({
+                    "chat_id": chat_id, "user_id": user_id, "action": "bite", "target_id": str(target_id)
                 })
-                await callback.answer("✅ Bite target selected.", show_alert=True)
+            elif len(current_bites) < 2:
+                await actions_col.insert_one({
+                    "chat_id": chat_id, "user_id": user_id, "action": "bite", "target_id": str(target_id)
+                })
             else:
                 await callback.answer("❌ You have already selected 2 targets.", show_alert=True)
-            await callback.message.delete()
+                return
+
+            others = await players_col.find({"game_id": player["game_id"], "_id": {"$ne": user_id}}).to_list(length=100)
+            selected_targets = await actions_col.find({
+                "chat_id": chat_id, "user_id": user_id, "action": "bite"
+            }).to_list(length=10)
+
+            selected_ids = [str(t["target_id"]) for t in selected_targets]
+            buttons = []
+
+            for p in others:
+                u = await client.get_users(p["_id"])
+                label = f"✅ {u.first_name}" if str(p["_id"]) in selected_ids else u.first_name
+                buttons.append([InlineKeyboardButton(label, callback_data=f"alpha_bite_{p['_id']}")])
+
+            try:
+                await callback.message.edit_text("🌙 Choose 2 targets to bite:", reply_markup=InlineKeyboardMarkup(buttons))
+            except:
+                pass
+
+            await callback.answer("✅ Selection updated.")

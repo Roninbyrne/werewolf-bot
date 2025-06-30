@@ -1,17 +1,18 @@
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+from pyrogram.enums import ParseMode
 
 import config
 from Werewolf import app
 from Werewolf.plugins.base.logging_toggle import is_logging_enabled
-from Werewolf.core.mongo import global_userinfo_db
+from Werewolf.core.mongo import global_userinfo_db, players_col
 from config import LOGGER_ID
+from bson import ObjectId
 
 
 @app.on_message(filters.command("start") & filters.private)
 async def start_pm(client, message: Message):
     user = message.from_user
-
     userinfo = {
         "_id": user.id,
         "first_name": user.first_name,
@@ -20,6 +21,24 @@ async def start_pm(client, message: Message):
         "is_bot": user.is_bot
     }
     await global_userinfo_db.update_one({"_id": user.id}, {"$set": userinfo}, upsert=True)
+
+    if message.text.startswith("/start reveal_"):
+        try:
+            game_id = ObjectId(message.text.split("_")[1])
+            player = await players_col.find_one({"_id": user.id, "game_id": game_id})
+            if not player:
+                await message.reply("❌ You are not part of this game.")
+                return
+            role = player.get("role", "Unknown").capitalize()
+            disguised = player.get("disguised", False)
+            text = f"🎭 Role: *{role}*"
+            if disguised:
+                text += "\n🕵️‍♂️ You are currently disguised."
+            await message.reply(text, parse_mode=ParseMode.MARKDOWN)
+            return
+        except:
+            await message.reply("❌ Invalid game ID.")
+            return
 
     if await is_logging_enabled():
         full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()

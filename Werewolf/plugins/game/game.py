@@ -18,6 +18,7 @@ from config import (
     ROLE_DOCTOR,
     ROLE_SPY,
 )
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 register_callbacks(app, games_col, players_col, actions_col)
 
@@ -38,7 +39,6 @@ async def start_game(client, message):
     }
     game_id = (await games_col.insert_one(game_data)).inserted_id
 
-    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(
         [[InlineKeyboardButton("📝 Join Game", callback_data=f"join_{game_id}")]]
     )
@@ -155,8 +155,44 @@ async def check_win_condition(chat_id, game_id):
         await app.send_message(chat_id, "🐺 Werewolves dominate the village! They win!")
         await reset_game(chat_id)
 
+async def night_phase_logic(chat_id, game_id, client, players_col, actions_col):
+    players = await players_col.find({"game_id": game_id}).to_list(length=100)
+    alpha = next((p for p in players if p.get("role") == ROLE_ALPHA), None)
+    if alpha:
+        alpha_id = alpha["_id"]
+        others = [p for p in players if p["_id"] != alpha_id]
+        buttons = []
+        for p in others:
+            user = await client.get_users(p["_id"])
+            buttons.append([InlineKeyboardButton(user.first_name, callback_data=f"alpha_bite_{p['_id']}")])
+        try:
+            await client.send_message(alpha_id, "🌙 Choose 2 targets to bite:", reply_markup=InlineKeyboardMarkup(buttons))
+        except:
+            await client.send_message(chat_id, "⚠️ Alpha could not be messaged. Ask them to start the bot.")
+
+    await asyncio.sleep(20)
+
+async def day_phase_logic(chat_id, game_id, client, players_col, actions_col, games_col):
+    bites = await actions_col.find({"chat_id": chat_id, "action": "bite"}).to_list(length=10)
+    if bites:
+        selected = random.choice(bites)
+        victim_id = int(selected["target_id"])
+        victim = await players_col.find_one({"_id": victim_id})
+        role = victim["role"]
+
+        if role in [ROLE_VILLAGER, ROLE_DOCTOR, ROLE_SPY]:
+            await players_col.update_one({"_id": victim_id}, {"$set": {"role": ROLE_WEREWOLF}})
+            msg = f"🧛 {role} was bitten and turned into a Werewolf!"
+        elif role == ROLE_WEREWOLF:
+            await players_col.delete_one({"_id": victim_id})
+            msg = f"🩸 A Werewolf was killed by the Alpha!"
+
+        await app.send_message(chat_id, msg)
+        await actions_col.delete_many({"chat_id": chat_id, "action": "bite"})
+
+    await check_win_condition(chat_id, game_id)
+
 async def day_night_cycle(chat_id, game_id):
-    from game.logic import night_phase_logic, day_phase_logic
     while True:
         game = await games_col.find_one({"_id": game_id, "active": True})
         if not game:

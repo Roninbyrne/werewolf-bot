@@ -9,7 +9,6 @@ from bson import ObjectId
 
 from werewolf.plugins.game.callbacks import register_callbacks
 from Werewolf.core.mongo import games_col, players_col, actions_col
-
 from config import (
     MONGO_DB_URI,
     JOIN_TIME,
@@ -27,11 +26,9 @@ register_callbacks(app, games_col, players_col, actions_col)
 @app.on_message(filters.command("startgame") & filters.group)
 async def start_game(client, message):
     chat_id = message.chat.id
-
     if await games_col.find_one({"chat_id": chat_id, "active": True}):
         await message.reply("❌ Game already running. Use /stopgame to stop.")
         return
-
     game_data = {
         "chat_id": chat_id,
         "active": True,
@@ -41,20 +38,15 @@ async def start_game(client, message):
         "day_night": "day",
     }
     game_id = (await games_col.insert_one(game_data)).inserted_id
-
-    keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("📝 Join Game", callback_data=f"join_{game_id}")]]
-    )
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("📝 Join Game", callback_data=f"join_{game_id}")]])
     await message.reply(
         f"🎲 Game started! Join in {JOIN_TIME} seconds (min {MIN_PLAYERS}, max {MAX_PLAYERS}).",
         reply_markup=keyboard,
     )
-
     await asyncio.sleep(JOIN_TIME)
 
     game = await games_col.find_one({"_id": game_id})
     players = game.get("players", [])
-
     if len(players) < MIN_PLAYERS:
         await games_col.update_one({"_id": game_id}, {"$set": {"active": False, "phase": "cancelled"}})
         await client.send_message(chat_id, f"❌ Not enough players ({len(players)}/{MIN_PLAYERS}). Game cancelled.")
@@ -64,20 +56,10 @@ async def start_game(client, message):
     for pid, role in zip(players, roles):
         await players_col.update_one(
             {"_id": pid},
-            {
-                "$set": {
-                    "role": role,
-                    "game_id": game_id,
-                    "game_chat": chat_id,
-                    "disguised": False,
-                    "healed_times": 0,
-                }
-            },
+            {"$set": {"role": role, "game_id": game_id, "game_chat": chat_id, "disguised": False, "healed_times": 0}},
             upsert=True,
         )
-
     await games_col.update_one({"_id": game_id}, {"$set": {"phase": "started"}})
-
     player_lines = []
     for i, pid in enumerate(players):
         user = await client.get_users(pid)
@@ -85,45 +67,40 @@ async def start_game(client, message):
         player_lines.append(f"{i+1}. [{full_name}](tg://user?id={pid})")
 
     bot_username = (await client.get_me()).username
-
     await client.send_message(
         chat_id,
         f"✅ Game started with {len(players)} players!\n" + "\n".join(player_lines),
         parse_mode=ParseMode.MARKDOWN,
     )
-
     reveal_button = InlineKeyboardMarkup(
         [[InlineKeyboardButton("🔍 Reveal Role (DM)", url=f"https://t.me/{bot_username}?start=reveal_{game_id}")]]
     )
-
     await client.send_message(
         chat_id,
         "🌞 *Daytime!* Please reveal your role within 30 seconds by clicking the button below:",
         reply_markup=reveal_button,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.MARKDOWN,
     )
-
     await asyncio.sleep(30)
 
     revealed_players = await players_col.find({"game_id": game_id, "role": {"$exists": True}}).to_list(length=100)
     revealed_count = len(revealed_players)
-
     if revealed_count < MIN_PLAYERS:
         total_joined = len(players)
         await client.send_message(
             chat_id,
-            f"⚠️ Only {revealed_count}/{total_joined} players revealed their roles.\n"
-            f"⌛ Waiting 10 more seconds before cancellation..."
+            f"⚠️ Only {revealed_count}/{total_joined} players revealed their roles.\n⌛ Waiting 10 more seconds..."
         )
         await asyncio.sleep(10)
         await games_col.update_one({"_id": game_id}, {"$set": {"active": False, "phase": "cancelled"}})
         await reset_game(chat_id)
-        await client.send_message(
-            chat_id,
-            f"❌ Game cancelled due to insufficient participation after reveal phase."
-        )
+        await client.send_message(chat_id, f"❌ Game cancelled due to insufficient participation after reveal phase.")
         return
 
+    vote_button = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("🩸 Time to Hunt", callback_data=f"nightvote_{game_id}")]]
+    )
+    await client.send_message(chat_id, "🌑 Beasts awaken...\nTap below to enter the shadows.", reply_markup=vote_button)
     asyncio.create_task(day_night_cycle(chat_id, game_id))
 
 
@@ -208,24 +185,50 @@ async def night_phase_logic(chat_id, game_id, client, players_col, actions_col):
     await asyncio.sleep(20)
 
 
+async def resolve_werewolf_votes(chat_id, game_id):
+    votes = await actions_col.find({"chat_id": chat_id, "action": "wvote"}).to_list(length=100)
+    count = {}
+    for v in votes:
+        tid = str(v["target_id"])
+        count[tid] = count.get(tid, 0) + 1
+    if not count:
+        await app.send_message(chat_id, "🐺 No consensus among the beasts. No one died.")
+        return
+    majority = max(count.items(), key=lambda x: x[1])
+    target_id = int(majority[0])
+    player = await players_col.find_one({"_id": target_id})
+    if not player:
+        return
+    role = player["role"]
+    user = await app.get_users(target_id)
+    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    if role == ROLE_WEREWOLF:
+        await app.send_message(chat_id, f"🐺 The beasts spared their own. No one died.")
+    elif role == ROLE_ALPHA:
+        await players_col.delete_one({"_id": target_id})
+        await app.send_message(chat_id, f"💔 Clan betrayal! {full_name} was the Alpha and has been killed.")
+    else:
+        await players_col.delete_one({"_id": target_id})
+        await app.send_message(chat_id, f"☠️ {full_name} was a {role.title()} and has been killed by the beasts.")
+    await actions_col.delete_many({"chat_id": chat_id, "action": "wvote"})
+
+
 async def day_phase_logic(chat_id, game_id, client, players_col, actions_col, games_col):
+    await resolve_werewolf_votes(chat_id, game_id)
     bites = await actions_col.find({"chat_id": chat_id, "action": "bite"}).to_list(length=10)
     if bites:
         selected = random.choice(bites)
         victim_id = int(selected["target_id"])
         victim = await players_col.find_one({"_id": victim_id})
         role = victim["role"]
-
         if role in [ROLE_VILLAGER, ROLE_DOCTOR, ROLE_SPY]:
             await players_col.update_one({"_id": victim_id}, {"$set": {"role": ROLE_WEREWOLF}})
             msg = f"🧛 {role} was bitten and turned into a Werewolf!"
         elif role == ROLE_WEREWOLF:
             await players_col.delete_one({"_id": victim_id})
             msg = f"🩸 A Werewolf was killed by the Alpha!"
-
         await app.send_message(chat_id, msg)
         await actions_col.delete_many({"chat_id": chat_id, "action": "bite"})
-
     await check_win_condition(chat_id, game_id)
 
 

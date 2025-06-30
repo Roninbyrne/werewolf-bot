@@ -13,7 +13,7 @@ def register_callbacks(app, games_col, players_col, actions_col):
             game_id = ObjectId(data.split("_")[1])
             game = await games_col.find_one({"_id": game_id})
             if not game or not game.get("active") or game.get("phase") != "lobby":
-                await callback.answer("❌ Not accepting joins.", show_alert=True)
+                await callback.answer("❌ Not accepting joins.")
                 return
             players = game.get("players", [])
             if user_id in players:
@@ -30,22 +30,17 @@ def register_callbacks(app, games_col, players_col, actions_col):
             game_id = ObjectId(data.split("_")[1])
             game = await games_col.find_one({"_id": game_id})
             player = await players_col.find_one({"_id": user_id, "game_id": game_id})
-            if not player or not player.get("role") in ["werewolf", "alpha"]:
-                await callback.answer("🧙 You are not a beast.", show_alert=True)
+            if not player or player.get("role") not in ["werewolf", "alpha"]:
+                await callback.answer("🧙 You are not a beast.")
                 return
 
-            players = await players_col.find({"game_id": game_id, "_id": {"$ne": user_id}}).to_list(length=100)
-            buttons = []
-            for p in players:
-                target_user = await client.get_users(p["_id"])
-                name = target_user.first_name
-                buttons.append([InlineKeyboardButton(name, callback_data=f"target_wvote_{p['_id']}")])
-            await client.send_message(
-                user_id,
-                "🩸 Choose your prey for tonight:",
+            start_link = f"https://t.me/{app.me.username}?start=vote_{game_id}"
+            buttons = [[InlineKeyboardButton("🩸 Vote in DM", url=start_link)]]
+            await callback.message.edit_text(
+                "🔮 Check your DM to vote:",
                 reply_markup=InlineKeyboardMarkup(buttons)
             )
-            await callback.answer("🔮 Check your DM to vote.", show_alert=True)
+            await callback.answer()
 
         elif data.startswith("action_"):
             action = data.split("_")[1]
@@ -71,7 +66,7 @@ def register_callbacks(app, games_col, players_col, actions_col):
                 await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": action, "target_id": target_id
                 })
-            await callback.answer("✅ Action submitted.", show_alert=True)
+            await callback.answer("✅ Action submitted.")
             await callback.message.delete()
 
         elif data.startswith("vote_"):
@@ -85,7 +80,7 @@ def register_callbacks(app, games_col, players_col, actions_col):
                 await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": "vote", "target_id": target_id
                 })
-            await callback.answer("✅ Vote submitted.", show_alert=True)
+            await callback.answer("✅ Vote submitted.")
             await callback.message.delete()
 
         elif data.startswith("target_wvote_"):
@@ -99,7 +94,7 @@ def register_callbacks(app, games_col, players_col, actions_col):
                 await actions_col.insert_one({
                     "chat_id": chat_id, "user_id": user_id, "action": "wvote", "target_id": target_id
                 })
-            await callback.answer("✅ Vote cast.", show_alert=True)
+            await callback.answer("✅ Vote cast.")
             await callback.message.delete()
 
         elif data.startswith("alpha_bite_"):
@@ -110,6 +105,7 @@ def register_callbacks(app, games_col, players_col, actions_col):
                 {"chat_id": chat_id, "user_id": user_id, "action": "bite"}
             ).to_list(length=10)
             target_ids = [str(t["target_id"]) for t in current_bites]
+
             if str(target_id) in target_ids:
                 await actions_col.delete_one({
                     "chat_id": chat_id, "user_id": user_id, "action": "bite", "target_id": str(target_id)
@@ -119,14 +115,17 @@ def register_callbacks(app, games_col, players_col, actions_col):
                     "chat_id": chat_id, "user_id": user_id, "action": "bite", "target_id": str(target_id)
                 })
             else:
-                await callback.answer("❌ You have already selected 2 targets.", show_alert=True)
+                await callback.answer("❌ You have already selected 2 targets.")
                 return
 
-            others = await players_col.find({"game_id": player["game_id"], "_id": {"$ne": user_id}}).to_list(length=100)
+            others = await players_col.find({
+                "game_id": player["game_id"], "_id": {"$ne": user_id}
+            }).to_list(length=100)
             selected_targets = await actions_col.find({
                 "chat_id": chat_id, "user_id": user_id, "action": "bite"
             }).to_list(length=10)
             selected_ids = [str(t["target_id"]) for t in selected_targets]
+
             buttons = []
             for p in others:
                 u = await client.get_users(p["_id"])

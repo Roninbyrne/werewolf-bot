@@ -162,3 +162,21 @@ def register_callbacks(app, games_col, players_col, actions_col):
                     "target_id": target_id
                 })
             await callback.answer("✅ Vote recorded.")
+
+        elif data.startswith("target_heal_"):
+            target_id = int(data.split("_")[2])
+            player = await players_col.find_one({"_id": user_id})
+            if not player or player.get("role") != "doctor":
+                await callback.answer("❌ You are not allowed to heal.")
+                return
+
+            chat_id = player.get("game_chat")
+            existing = await actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": "heal"})
+            if existing:
+                await actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
+            else:
+                await actions_col.insert_one({
+                    "chat_id": chat_id, "user_id": user_id, "action": "heal", "target_id": target_id
+                })
+            await callback.answer("✅ Heal target submitted.")
+            await callback.message.delete()

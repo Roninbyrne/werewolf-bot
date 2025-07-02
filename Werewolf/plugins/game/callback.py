@@ -171,6 +171,16 @@ def register_callbacks(app, games_col, players_col, actions_col):
                 return
 
             chat_id = player.get("game_chat")
+            healed_times = player.get("healed_times", 0)
+
+            if user_id == target_id:
+                if healed_times % 3 != 0:
+                    await callback.answer("❌ You can only heal yourself once every 3 heals.")
+                    return
+                await players_col.update_one({"_id": user_id}, {"$inc": {"healed_times": 1}})
+            else:
+                await players_col.update_one({"_id": user_id}, {"$inc": {"healed_times": 1}})
+
             existing = await actions_col.find_one({"chat_id": chat_id, "user_id": user_id, "action": "heal"})
             if existing:
                 await actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})

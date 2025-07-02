@@ -64,6 +64,30 @@ async def start_pm(client, message: Message):
             await message.reply("❌ Something went wrong.")
             return
 
+    if message.text.startswith("/start heal_"):
+        try:
+            game_id = ObjectId(message.text.split("_")[1])
+            player = await players_col.find_one({"_id": user.id, "game_id": game_id})
+            if not player or player.get("role") != "doctor":
+                await message.reply("❌ You are not allowed to heal.")
+                return
+
+            players = await players_col.find({
+                "game_id": game_id,
+                "_id": {"$ne": user.id}
+            }).to_list(length=100)
+
+            buttons = [
+                [InlineKeyboardButton((await client.get_users(p["_id"])).first_name, callback_data=f"target_heal_{p['_id']}")]
+                for p in players
+            ]
+
+            await message.reply("🩺 Choose someone to heal tonight:", reply_markup=InlineKeyboardMarkup(buttons))
+            return
+        except:
+            await message.reply("❌ Something went wrong.")
+            return
+
     if await is_logging_enabled():
         full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
         username = f"@{user.username}" if user.username else "N/A"

@@ -222,6 +222,19 @@ async def send_day_vote_message(chat_id, game_id):
 
 async def night_phase_logic(chat_id, game_id, client, players_col, actions_col):
     players = await players_col.find({"game_id": game_id}).to_list(length=100)
+    doctor = next((p for p in players if p.get("role") == ROLE_DOCTOR), None)
+    if doctor:
+        doctor_id = doctor["_id"]
+        all_targets = players
+        buttons = []
+        for p in all_targets:
+            user = await client.get_users(p["_id"])
+            buttons.append([InlineKeyboardButton(user.first_name, callback_data=f"target_heal_{p['_id']}")])
+        await client.send_message(
+            doctor_id,
+            "💉 Choose someone to heal tonight (you may heal yourself only once every 3 uses):",
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
     alpha = next((p for p in players if p.get("role") == ROLE_ALPHA), None)
     if alpha:
         alpha_id = alpha["_id"]
@@ -234,6 +247,8 @@ async def night_phase_logic(chat_id, game_id, client, players_col, actions_col):
     await asyncio.sleep(20)
 
 async def resolve_werewolf_votes(chat_id, game_id):
+    heals = await actions_col.find({"chat_id": chat_id, "action": "heal"}).to_list(length=10)
+    healed_id = int(heals[0]["target_id"]) if heals else None
     votes = await actions_col.find({"chat_id": chat_id, "action": "wvote"}).to_list(length=100)
     count = {}
     for v in votes:
@@ -241,24 +256,28 @@ async def resolve_werewolf_votes(chat_id, game_id):
         count[tid] = count.get(tid, 0) + 1
     if not count:
         await app.send_message(chat_id, "🐺 No consensus among the beasts. No one died.")
-        return
-    majority = max(count.items(), key=lambda x: x[1])
-    target_id = int(majority[0])
-    player = await players_col.find_one({"_id": target_id})
-    if not player:
-        return
-    role = player["role"]
-    user = await app.get_users(target_id)
-    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-    if role == ROLE_WEREWOLF:
-        await app.send_message(chat_id, f"🐺 The beasts spared their own. No one died.")
-    elif role == ROLE_ALPHA:
-        await players_col.delete_one({"_id": target_id})
-        await app.send_message(chat_id, f"💔 Clan betrayal! {full_name} was the Alpha and has been killed.")
     else:
-        await players_col.delete_one({"_id": target_id})
-        await app.send_message(chat_id, f"☠️ {full_name} was a {role.title()} and has been killed by the beasts.")
+        majority = max(count.items(), key=lambda x: x[1])
+        target_id = int(majority[0])
+        if healed_id == target_id:
+            user = await app.get_users(target_id)
+            await app.send_message(chat_id, f"💉 {user.first_name} was targeted but saved by the Doctor!")
+        else:
+            player = await players_col.find_one({"_id": target_id})
+            if player:
+                role = player["role"]
+                user = await app.get_users(target_id)
+                full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+                if role == ROLE_WEREWOLF:
+                    await app.send_message(chat_id, f"🐺 The beasts spared their own. No one died.")
+                elif role == ROLE_ALPHA:
+                    await players_col.delete_one({"_id": target_id})
+                    await app.send_message(chat_id, f"💔 Clan betrayal! {full_name} was the Alpha and has been killed.")
+                else:
+                    await players_col.delete_one({"_id": target_id})
+                    await app.send_message(chat_id, f"☠️ {full_name} was a {role.title()} and has been killed by the beasts.")
     await actions_col.delete_many({"chat_id": chat_id, "action": "wvote"})
+    await actions_col.delete_many({"chat_id": chat_id, "action": "heal"})
 
 async def day_phase_logic(chat_id, game_id, client, players_col, actions_col, games_col):
     await resolve_werewolf_votes(chat_id, game_id)
@@ -266,16 +285,23 @@ async def day_phase_logic(chat_id, game_id, client, players_col, actions_col, ga
     if bites:
         selected = random.choice(bites)
         victim_id = int(selected["target_id"])
-        victim = await players_col.find_one({"_id": victim_id})
-        role = victim["role"]
-        if role in [ROLE_VILLAGER, ROLE_DOCTOR, ROLE_SPY]:
-            await players_col.update_one({"_id": victim_id}, {"$set": {"role": ROLE_WEREWOLF}})
-            msg = f"🧛 {role} was bitten and turned into a Werewolf!"
-        elif role == ROLE_WEREWOLF:
-            await players_col.delete_one({"_id": victim_id})
-            msg = f"🩸 A Werewolf was killed by the Alpha!"
-        await app.send_message(chat_id, msg)
-        await actions_col.delete_many({"chat_id": chat_id, "action": "bite"})
+        heals = await actions_col.find({"chat_id": chat_id, "action": "heal"}).to_list(length=10)
+        healed_ids = {int(h["target_id"]) for h in heals}
+        if victim_id in healed_ids:
+            user = await app.get_users(victim_id)
+            await app.send_message(chat_id, f"🛡️ {user.first_name} was attacked but healed by the Doctor!")
+        else:
+            victim = await players_col.find_one({"_id": victim_id})
+            role = victim["role"]
+            if role in [ROLE_VILLAGER, ROLE_DOCTOR, ROLE_SPY]:
+                await players_col.update_one({"_id": victim_id}, {"$set": {"role": ROLE_WEREWOLF}})
+                msg = f"🧛 {role} was bitten and turned into a Werewolf!"
+            elif role == ROLE_WEREWOLF:
+                await players_col.delete_one({"_id": victim_id})
+                msg = f"🩸 A Werewolf was killed by the Alpha!"
+            await app.send_message(chat_id, msg)
+    await actions_col.delete_many({"chat_id": chat_id, "action": "bite"})
+    await actions_col.delete_many({"chat_id": chat_id, "action": "heal"})
     await check_win_condition(chat_id, game_id)
     await send_day_vote_message(chat_id, game_id)
 

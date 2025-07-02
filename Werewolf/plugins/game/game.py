@@ -7,7 +7,7 @@ import asyncio
 import random
 from bson import ObjectId
 
-from Werewolf.plugins.game.callbacks import register_callbacks
+from Werewolf.plugins.game.callbacks import register_callback
 from Werewolf.core.mongo import games_col, players_col, actions_col
 from config import (
     MONGO_DB_URI,

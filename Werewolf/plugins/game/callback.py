@@ -33,13 +33,9 @@ def register_callbacks(app, games_col, players_col, actions_col):
             if not player or player.get("role") not in ["werewolf", "alpha"]:
                 await callback.answer("🧙 You are not a beast.")
                 return
-
             start_link = f"https://t.me/{app.me.username}?start=vote_{game_id}"
             buttons = [[InlineKeyboardButton("🩸 Vote in DM", url=start_link)]]
-            await callback.message.edit_text(
-                "🔮 Check your DM to vote:",
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
+            await callback.message.edit_text("🔮 Check your DM to vote:", reply_markup=InlineKeyboardMarkup(buttons))
             await callback.answer()
 
         elif data.startswith("action_"):
@@ -136,3 +132,33 @@ def register_callbacks(app, games_col, players_col, actions_col):
             except:
                 pass
             await callback.answer("✅ Selection updated.")
+
+        elif data.startswith("dayvote_"):
+            parts = data.split("_")
+            target_id = int(parts[1])
+            game_id = ObjectId(parts[2])
+
+            player = await players_col.find_one({"_id": user_id, "game_id": game_id})
+            if not player:
+                await callback.answer("❌ You are not allowed to vote.")
+                return
+
+            role = player.get("role")
+            if role not in ["villager", "spy"]:
+                await callback.answer("❌ You are not allowed to vote.")
+                return
+
+            chat_id = player.get("game_chat")
+            existing = await actions_col.find_one({
+                "chat_id": chat_id, "user_id": user_id, "action": "vote_day"
+            })
+            if existing:
+                await actions_col.update_one({"_id": existing["_id"]}, {"$set": {"target_id": target_id}})
+            else:
+                await actions_col.insert_one({
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "action": "vote_day",
+                    "target_id": target_id
+                })
+            await callback.answer("✅ Vote recorded.")

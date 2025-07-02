@@ -36,6 +36,7 @@ async def start_game(client, message):
         "phase": "lobby",
         "start_time": datetime.utcnow(),
         "day_night": "day",
+        "day_count": 0,
     }
     game_id = (await games_col.insert_one(game_data)).inserted_id
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("📝 Join Game", callback_data=f"join_{game_id}")]])
@@ -103,7 +104,6 @@ async def start_game(client, message):
     await client.send_message(chat_id, "🌑 Beasts awaken...\nTap below to enter the shadows.", reply_markup=vote_button)
     asyncio.create_task(day_night_cycle(chat_id, game_id))
 
-
 @app.on_message(filters.command("stopgame") & filters.group)
 async def stop_game(client, message):
     chat_id = message.chat.id
@@ -114,7 +114,6 @@ async def stop_game(client, message):
     await reset_game(chat_id)
     await message.reply("🛑 Game stopped by admin.")
 
-
 @app.on_message(filters.group & filters.text & ~filters.service)
 async def suppress_messages_at_night(client, message):
     chat_id = message.chat.id
@@ -124,14 +123,12 @@ async def suppress_messages_at_night(client, message):
     if game.get("day_night") == "night":
         await message.delete()
 
-
 async def reset_game(chat_id):
     await games_col.update_one({"chat_id": chat_id, "active": True}, {"$set": {"active": False, "phase": "stopped"}})
     await players_col.update_many({"game_chat": chat_id}, {"$unset": {
         "role": "", "game_id": "", "disguised": "", "healed_times": "", "spy_once_used": ""
     }})
     await actions_col.delete_many({"chat_id": chat_id})
-
 
 def generate_roles(num):
     roles = []
@@ -150,7 +147,6 @@ def generate_roles(num):
     random.shuffle(roles)
     return roles
 
-
 async def count_roles(game_id):
     players = await players_col.find({"game_id": game_id}).to_list(length=100)
     role_counts = {ROLE_WEREWOLF: 0, ROLE_ALPHA: 0, ROLE_VILLAGER: 0}
@@ -159,7 +155,6 @@ async def count_roles(game_id):
         if role in role_counts:
             role_counts[role] += 1
     return role_counts
-
 
 async def check_win_condition(chat_id, game_id):
     roles = await count_roles(game_id)
@@ -170,6 +165,60 @@ async def check_win_condition(chat_id, game_id):
         await app.send_message(chat_id, "🐺 Werewolves dominate the village! They win!")
         await reset_game(chat_id)
 
+async def send_day_vote_message(chat_id, game_id):
+    game = await games_col.find_one({"_id": game_id})
+    day = game.get("day_count", 0) + 1
+    players = await players_col.find({"game_id": game_id}).to_list(length=100)
+    alive_players = [p for p in players if p.get("role")]
+
+    spy_alive = any(p for p in alive_players if p.get("role") == ROLE_SPY)
+    if day % 3 == 0 and spy_alive:
+        candidates = []
+        werewolf_list = [p for p in alive_players if p.get("role") in [ROLE_WEREWOLF, ROLE_ALPHA]]
+        other_list = [p for p in alive_players if p.get("role") not in [ROLE_WEREWOLF, ROLE_ALPHA]]
+        if werewolf_list:
+            candidates.append(random.choice(werewolf_list))
+        candidates.extend(random.sample(other_list, min(2, len(other_list))))
+        random.shuffle(candidates)
+        text = "🕵️ The Spy has uncovered suspicious players from last night. Choose who to investigate:"
+    else:
+        candidates = alive_players
+        text = "🔎 Time to find the beast! Choose who you think is a werewolf:"
+
+    buttons = []
+    for p in candidates:
+        user = await app.get_users(p["_id"])
+        count = await actions_col.count_documents({
+            "chat_id": chat_id, "action": "vote_day", "target_id": p["_id"]
+        })
+        label = f"{user.first_name} 👍 {count}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"dayvote_{p['_id']}_{game_id}")])
+
+    markup = InlineKeyboardMarkup(buttons)
+    await app.send_message(chat_id, text, reply_markup=markup)
+    await asyncio.sleep(60)
+
+    votes = await actions_col.find({"chat_id": chat_id, "action": "vote_day"}).to_list(length=100)
+    count = {}
+    for v in votes:
+        tid = str(v["target_id"])
+        count[tid] = count.get(tid, 0) + 1
+
+    if not count:
+        await app.send_message(chat_id, "🤷 No one voted.")
+    else:
+        top = max(count.values())
+        top_ids = [int(k) for k, v in count.items() if v == top]
+        eliminated = random.choice(top_ids)
+        await players_col.delete_one({"_id": eliminated})
+        user = await app.get_users(eliminated)
+        role = next((p.get("role") for p in players if p["_id"] == eliminated), "villager")
+        if role in [ROLE_WEREWOLF, ROLE_ALPHA]:
+            await app.send_message(chat_id, f"🔥 {user.first_name} was eliminated by vote. They were a {role.upper()}")
+        else:
+            await app.send_message(chat_id, f"⚰️ {user.first_name} was eliminated by vote. They were a {role.upper()}")
+    await actions_col.delete_many({"chat_id": chat_id, "action": "vote_day"})
+    await games_col.update_one({"_id": game_id}, {"$inc": {"day_count": 1}})
 
 async def night_phase_logic(chat_id, game_id, client, players_col, actions_col):
     players = await players_col.find({"game_id": game_id}).to_list(length=100)
@@ -183,7 +232,6 @@ async def night_phase_logic(chat_id, game_id, client, players_col, actions_col):
             buttons.append([InlineKeyboardButton(user.first_name, callback_data=f"alpha_bite_{p['_id']}")])
         await client.send_message(alpha_id, "🌙 Choose 2 targets to bite:", reply_markup=InlineKeyboardMarkup(buttons))
     await asyncio.sleep(20)
-
 
 async def resolve_werewolf_votes(chat_id, game_id):
     votes = await actions_col.find({"chat_id": chat_id, "action": "wvote"}).to_list(length=100)
@@ -212,7 +260,6 @@ async def resolve_werewolf_votes(chat_id, game_id):
         await app.send_message(chat_id, f"☠️ {full_name} was a {role.title()} and has been killed by the beasts.")
     await actions_col.delete_many({"chat_id": chat_id, "action": "wvote"})
 
-
 async def day_phase_logic(chat_id, game_id, client, players_col, actions_col, games_col):
     await resolve_werewolf_votes(chat_id, game_id)
     bites = await actions_col.find({"chat_id": chat_id, "action": "bite"}).to_list(length=10)
@@ -230,7 +277,7 @@ async def day_phase_logic(chat_id, game_id, client, players_col, actions_col, ga
         await app.send_message(chat_id, msg)
         await actions_col.delete_many({"chat_id": chat_id, "action": "bite"})
     await check_win_condition(chat_id, game_id)
-
+    await send_day_vote_message(chat_id, game_id)
 
 async def day_night_cycle(chat_id, game_id):
     while True:
@@ -246,7 +293,6 @@ async def day_night_cycle(chat_id, game_id):
         else:
             await day_phase_logic(chat_id, game_id, app, players_col, actions_col, games_col)
         await asyncio.sleep(60)
-
 
 if __name__ == "__main__":
     app.run()
